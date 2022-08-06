@@ -1,0 +1,25 @@
+Metadata-Version: 2.1
+Name: treedict
+Version: 0.2.2
+Summary: A fast and full-featured dict-like tree container to simplify the bookkeeping surrounding parameters, variables and data.
+Home-page: http://www.stat.washington.edu/~hoytak/code/treedict/
+Download-URL: http://pypi.python.org/packages/source/t/treedict/treedict-0.2.2.tar.gz
+Author: Hoyt Koepke
+Author-email: hoytak@gmail.com
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Cython
+Classifier: Programming Language :: C
+Classifier: Topic :: Scientific/Engineering
+Classifier: Topic :: Software Development
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+License-File: LICENSE.txt
+
+UNKNOWN
+
