@@ -191,7 +191,7 @@ class CSSerialDeviceServerNoSim(LabradServer):
             parity = kwargs.get('parity')
             debug = kwargs.get('debug')
             # serial parameters
-            ser.open(port,self.simulated)
+            ser.open(port)
            
             if timeout is not None: ser.timeout(timeout)
             if baudrate is not None: ser.baudrate(baudrate)

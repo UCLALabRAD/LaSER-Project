@@ -8,7 +8,7 @@ from UCLA_CS_labrad.scripts.experiments.qsimexperiment import QsimExperiment
 
 class experiment_example(QsimExperiment):
 
-    name = 'Example Experiment'  # gives a name to display on scripscanner
+    name = 'CS Example Experiment 2'  # gives a name to display on scripscanner
 
     '''
     This expirement_example inherits from the QsimExperiment Class which in
@@ -27,8 +27,8 @@ class experiment_example(QsimExperiment):
     # variable named self.p.parameter_folder.parameter
 
     exp_parameters = []
-    exp_parameters.append(('example_parameters', 'Range'))  # The format is (parameter folder, parameter)
-    exp_parameters.append(('example_parameters', 'Amplitude'))
+    exp_parameters.append(('cs_example_parameters', 'Range'))  # The format is (parameter folder, parameter)
+    exp_parameters.append(('cs_example_parameters', 'Amplitude'))
 
     def initialize(self, cxn, context, ident):
 
@@ -40,7 +40,7 @@ class experiment_example(QsimExperiment):
         '''
 
         self.ident = ident  # this is required so that script scanner can sort and access different instances
-        self.pzt_server = cxn.cs_piezo_server_no_sim
+        self.pzt_server = cxn.cs_piezo_server
         self.pzt_channel = 1
 
     def run(self, cxn, context):
@@ -51,11 +51,11 @@ class experiment_example(QsimExperiment):
         example we will draw a parabola for a given range with a given amplitude
         '''
         self.setup_datavault('Range', 'Amplitude')  # gives the x and y names to Data Vault
-        self.setup_grapher('experiment_example')  # Tells the grapher which tab to plot the data on
-        self.amplitude = self.p.example_parameters.Amplitude  # shortens the amplitude name
+        #self.setup_grapher('experiment_example')  # Tells the grapher which tab to plot the data on
+        self.amplitude = self.p.cs_example_parameters.Amplitude  # shortens the amplitude name
         # the following generates a list of the points used in the scan. If the points
         # have LabRAD unit types they can be specified in the second argument
-        self.x_values = self.get_scan_list(self.p.example_parameters.Range, units=None)
+        self.x_values = self.get_scan_list(self.p.cs_example_parameters.Range, units=None)
 
         self.pzt_voltage = self.pzt_server.voltage(self.pzt_channel)
 
@@ -70,9 +70,9 @@ class experiment_example(QsimExperiment):
                 break
 
             y_point = self.amplitude * 0.5*x_point  # calculates the parabola
-            self.pzt_server.voltage(self.pzt_channel, self.pzt_voltage + U(y_point, 'V'))
+            self.pzt_server.voltage(self.pzt_channel, self.pzt_voltage + y_point)
 
-            assert self.pzt_server.get_voltage(self.pzt_channel) != self.pzt_voltage
+            assert self.pzt_server.voltage(self.pzt_channel) != self.pzt_voltage
 
             self.dv.add(x_point, y_point)  # adds the data to Data Vault which will be automatically plotted
 
@@ -88,7 +88,7 @@ class experiment_example(QsimExperiment):
 if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()  # creates LabRAD connection
-    scanner = cxn.cs_scriptscanner  # connects to script scanner server
+    scanner = cxn.csscriptscanner  # connects to script scanner server
     exprt = experiment_example(cxn=cxn)  # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)  # executes the experiment

@@ -2,9 +2,9 @@
 import labrad
 from UCLA_CS_labrad.scripts.experiments.qsimexperiment import QsimExperiment
  
-class experiment_example(qsimexperiment.QsimExperiment): 
+class experiment_example(QsimExperiment): 
 
-    name = 'Example Experiment'  # gives a name to display on scripscanner
+    name = 'CS Example Experiment'  # gives a name to display on scripscanner
 
     '''
     This expirement_example inherits from the QsimExperiment Class which in
@@ -21,8 +21,8 @@ class experiment_example(qsimexperiment.QsimExperiment):
     # variable named self.p.parameter_folder.parameter
 
     exp_parameters = []
-    exp_parameters.append(('example_parameters', 'Range'))  # The format is (parameter folder, parameter)
-    exp_parameters.append(('example_parameters', 'Amplitude'))
+    exp_parameters.append(('cs_example_parameters', 'Range'))  # The format is (parameter folder, parameter)
+    exp_parameters.append(('cs_example_parameters', 'Amplitude'))
 
     def initialize(self, cxn, context, ident):
 
@@ -44,10 +44,10 @@ class experiment_example(qsimexperiment.QsimExperiment):
         '''
         self.setup_datavault('Range', 'Amplitude')  # gives the x and y names to Data Vault
         #self.setup_grapher('experiment_example')  # Tells the grapher which tab to plot the data on
-        self.amplitude = self.p.example_parameters.Amplitude  # shortens the amplitude name
+        self.amplitude = self.p.cs_example_parameters.Amplitude  # shortens the amplitude name
         # the following generates a list of the points used in the scan. If the points
         # have LabRAD unit types they can be specified in the second argument
-        self.x_values = self.get_scan_list(self.p.example_parameters.Range, units=None)
+        self.x_values = self.get_scan_list(self.p.cs_example_parameters.Range, units=None)
 
         for i, x_point in enumerate(self.x_values):  # Main Loop. Every iteration will have an index i and an associated x point 
 
@@ -72,7 +72,7 @@ class experiment_example(qsimexperiment.QsimExperiment):
 if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()  # creates LabRAD connection
-    scanner = cxn.cs_scriptscanner  # connects to script scanner server
+    scanner = cxn.csscriptscanner  # connects to script scanner server
     exprt = experiment_example(cxn=cxn)  # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)  # executes the experiment

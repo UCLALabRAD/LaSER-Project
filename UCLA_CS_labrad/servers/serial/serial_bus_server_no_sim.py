@@ -177,6 +177,7 @@ class CSSerialServerNoSim(CSPollingServer):
             for x in self.SerialPorts:
                 if os.path.normcase(x.name) == os.path.normcase(port):
                     try:
+						
                         c['PortObject'] = Serial(x.devicepath, timeout=0)
                         return x.name
                     except SerialException as e:
