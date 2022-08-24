@@ -38,6 +38,13 @@ class NoPortSelectedError(Error):
     Please open a port first.
     """
     code = 1
+    
+
+class NoSimulatedServerSelectedError(Error):
+    """
+    Please open a port first.
+    """
+    code = 2
 
 class NoPortsAvailableError(Error):
     """
@@ -50,6 +57,7 @@ SerialDevice = collections.namedtuple('SerialDevice', ['name', 'devicepath'])
 PORTSIGNAL = 539410
 
 
+
 class CSSerialServerSim(CSPollingServer):
     """
     Provides access to a computer's serial (COM) ports.
@@ -58,6 +66,79 @@ class CSSerialServerSim(CSPollingServer):
     name = '%LABRADNODE% CS Serial Server without Simulation'
     POLL_ON_STARTUP = True
     port_update = Signal(PORTSIGNAL, 'signal: port update', '(s,*s)')
+
+
+    class DeviceConnection(object):
+        """
+        Wrapper for our server's client connection to the serial server.
+        @raise labrad.types.Error: Error in opening serial connection
+        """
+        def __init__(self, hardware_simulating_server, device_id, **kwargs):
+        
+            self.ser=hardware_simulating_server
+    
+            self.device_id=device_id
+        
+            self.name=device_object.name+" Simulated Device " +device_id
+            self.ID=self.ser.ID
+            
+            self.ctxt=hardware_simulating_server.context()
+            self.ctxt['Device ID']=device_id
+
+            self.BAUDRATES=hardware_simulating_server.get_allowed_baudrates()
+            self.BYTESIZES=hardware_simulating_server.get_allowed_bytesizes()
+
+            self.PARITIES=hardware_simulating_server.get_allowed_parities()
+            
+            self.STOPBITS=hardware_simulating_server.get_allowed_stopbits()
+            
+            self.timeout = kwargs.get('timeout')
+            self.baudrate = kwargs.get('baudrate')
+            self.bytesize = kwargs.get('bytesize')
+            self.parity = kwargs.get('parity')
+            self.debug = kwargs.get('debug')
+            
+
+            # serial r/w
+            def read(self,bytes):
+                beg, rest=self.input_buffer[:bytes],self.input_buffer[bytes:]
+                return beg #bytes vs bytearray?
+
+            def write(self,s):
+                self.output_buffer.extend(s)
+                
+            #should we have buffer be set size instead of using extend? setbuffersize doesn't seem to be present in API
+            
+            
+            self.input_buffer=bytearray(b'')
+            self.output_buffer=bytearray(b'')
+            
+            
+            def reset_input_buffer(self):
+                #flush here
+                self.
+                
+            def reset_output_buffer(self):
+                self.
+            
+            @property
+            def in_waiting(self):
+
+
+            @property
+            def out_waiting(self):
+
+            
+
+            
+            self.open =
+            self.close =
+            
+            
+            
+            
+
+
 
     def initServer(self):
         super().initServer()
@@ -121,16 +202,16 @@ class CSSerialServerSim(CSPollingServer):
         self.port_update(self.name, port_list_tmp)
 
     def expireContext(self, c):
-        if 'PortObject' in c:
-            c['PortObject'].close()
+        
+       
 
-    def getPort(self, c):
-        try:
-            return c['PortObject']
-        except Exception as e:
-            raise NoPortSelectedError()
-
-    @setting(1, 'List Serial Ports', returns=['*s: List of serial ports'])
+    def getPortOrSimServer(self, c,device_id):
+        #perhaps check connection actually exists here?
+        return c['Connections'][device_id]
+        
+        
+#Get Information About Ports
+    @setting(11, 'List Serial Ports', returns='*s: List of serial ports')
     def list_serial_ports(self, c):
         """
         Retrieves a list of all serial ports.
@@ -140,12 +221,15 @@ class CSSerialServerSim(CSPollingServer):
         """
         port_list = [x.name for x in self.SerialPorts]
         return port_list
+    
 
 
-    # CONNECT
-    @setting(10, 'Open', port=[': Open the first available port', 's: Port to open, e.g. COM4'],
-             returns=['s: Opened port'])
-    def open(self, c, port=''):
+
+
+    # PORT CONNECTION
+    @setting(21, 'Open', port='s: Port to open, e.g. COM4',
+             returns='s: device_id of initial device')
+    def open_port(self, c, port):
         """
         Opens a serial port in the current context.
 
@@ -158,52 +242,101 @@ class CSSerialServerSim(CSPollingServer):
         /dev/ prefix.  This is case insensitive on windows, case sensitive
         on Linux.  For compatibility, always use the same case.
         """
-        c['Timeout'] = 0
-        c['Debug'] = False
-        if 'PortObject' in c:
-            c['PortObject'].close()
-            del c['PortObject']
-        if not port:
-            for i in range(len(self.SerialPorts)):
-                try:
-                    c['PortObject'] = Serial(self.SerialPorts[i].devicepath,
-                                             timeout=0)
-                    break
-                except SerialException:
-                    pass
-            if 'PortObject' not in c:
-                raise NoPortsAvailableError()
+        
+        
+        if 'Connections' in c:
+            for ID in c['Connections']:
+                device_disconnect_helper(c,ID)
         else:
-            for x in self.SerialPorts:
-                if os.path.normcase(x.name) == os.path.normcase(port):
-                    try:
-                        c['PortObject'] = Serial(x.devicepath, timeout=0)
-                        return x.name
-                    except SerialException as e:
-                        if e.message.find('cannot find') >= 0:
-                            raise Error(code=1, msg=e.message)
-                        else:
-                            raise Error(code=2, msg=e.message)
-        raise Error(code=1, msg='Unknown port %s' % (port,))
-
-    @setting(11, 'Close', returns=[''])
-    def close(self, c):
+            c['Connections']={}
+            
+        c['PortString']=port
+        
+        self.device_connect(c,'0')
+        
+        self.device_connect(c,'1')
+        
+        if len(c['Connections'].keys())==0:
+            del c['Connections']
+            raise Error()
+        else:
+            c['PortString']=port
+            if '0' in c['Connections']:
+                return '0'
+            else:
+                return '1'
+    
+    
+    
+    @setting(11, 'Close Port', returns='')
+    def close_port(self, c):
         """
         Closes the current serial port.
         """
-        if 'PortObject' in c:
-            c['PortObject'].close()
-            del c['PortObject']
+        if 'Connections' in c:
+            for ID in c['Connections']:
+                device_disconnect_helper(c,ID)
+                del c['Connections'][ID]
+            del c['Connections']
+        
+
+
+
+#SDS-TO-DEVICE CONNECTION
+    @setting(22, 'Connect to Physical Device', returns='')
+    def phys_device_connect(self, c):
+        self.device_connect(c,'0')
+
+    @setting(23,'Connect to Simulated Device',device_id='s',returns='')
+    def sim_device_connect(self, c,device_id):
+        self.device_connect(c,device_id)
+        
+    @setting(24,'Disconnect from Device',device_id='s',returns='')
+    def device_disconnect(self, c,device_id):
+        self.device_disconnect_helper(c,device_id)
+       
+    @setting(25,'Get List of Connected Devices at Port',returns='*s')
+    def get_conn_devices_at_port_list(self, c):
+        return c['Connections'].keys()
+        
+    @setting(26,'Get List of All Devices At Port',returns='*s')
+    def get_all_devices_at_port_list(self, c):
+        return self.serialServers[c['PortString']].get_all_devices_at_port_list()
+
+
+
+    def deviceConnect(self,c,device_id):
+        port=c['PortString']
+        if device_id=='0':
+            for x in self.SerialPorts:
+                if os.path.normcase(x.name) == os.path.normcase(port):
+                    try:
+                        physical_device_object=Serial(x.devicepath, timeout=0)
+                        c['Connections']['0'] =
+                         DeviceConnection('0',physical_device_object,**kwargs)
+                    except SerialException as e:
+                       #error
+        else:
+            if port in self.simulated_servers:
+            sim_device_object=self.simulated_servers[port]
+                c['Connections'][device_id] = DeviceConnection(device_id,sim_device_object, **kwargs)
+    
+    def device_disconnect_helper(self,c,device_id):
+        if (device_id=='0' and '1' not in c['Connections']) or (device_id=='1' and '0' not in c['Connections']):
+            #error
+        
+        c['Connections'][device_id].disconnect()
+        del c['Connections'][device_id]
 
 
     # CONNECTION PARAMETERS
-    @setting(20, 'Baudrate', data=[': List baudrates', 'w: Set baudrate (0: query current)'],
+    @setting(31, 'Baudrate', data=[': List baudrates', 'w: Set baudrate (0: query current)'],
              returns=['w: Selected baudrate', '*w: Available baudrates'])
     def baudrate(self, c, data=None):
         """
         Sets the baudrate.
         """
-        ser = self.getPort(c)
+        ser = self.get_device(c,device_id)
         baudrates = list(ser.BAUDRATES)
         #allow non-standard baud rates
         baudrates.extend([28800])
@@ -211,100 +344,104 @@ class CSSerialServerSim(CSPollingServer):
             return baudrates
         else:
             if data in baudrates:
-                ser.baudrate = data
+                ser.baudrate=data
             return int(ser.baudrate)
 
-    @setting(21, 'Bytesize', data=[': List bytesizes', 'w: Set bytesize (0: query current)'], returns=['*w: Available bytesizes', 'w: Selected bytesize'])
-    def bytesize(self, c, data=None):
+    @setting(32, 'Bytesize', data=[': List bytesizes', 'w: Set bytesize (0: query current)'], returns=['*w: Available bytesizes', 'w: Selected bytesize'])
+    def bytesize(self, c, device_id,data=None):
         """
         Sets the bytesize.
         """
-        ser = self.getPort(c)
+        ser = self.get_device(c,device_id)
         bytesizes = ser.BYTESIZES
         if data is None:
             return bytesizes
         else:
             if data in bytesizes:
-                ser.bytesize = data
+                ser.bytesize=data
             return int(ser.bytesize)
 
-    @setting(22, 'Parity', data=[': List parities', 's: Set parity (empty: query current)'], returns=['*s: Available parities', 's: Selected parity'])
-    def parity(self, c, data=None):
+    @setting(33, 'Parity', data=[': List parities', 's: Set parity (empty: query current)'], returns=['*s: Available parities', 's: Selected parity'])
+    def parity(self, c, device_id, data=None):
         """
         Sets the parity.
         """
-        ser = self.getPort(c)
+        ser = self.get_device(c,device_id)
         parities = ser.PARITIES
         if data is None:
             return parities
         else:
             data = data.upper()
             if data in parities:
-                ser.parity = data
+                ser.parity=data
             return ser.parity
 
-    @setting(23, 'Stopbits', data=[': List stopbits', 'w: Set stopbits (0: query current)'],
+    @setting(34, 'Stopbits', data=[': List stopbits', 'w: Set stopbits (0: query current)'],
              returns=['*w: Available stopbits', 'w: Selected stopbits'])
-    def stopbits(self, c, data=None):
+    def stopbits(self, c, device_id, data=None):
         """
         Sets the number of stop bits.
         """
-        ser = self.getPort(c)
+        ser = self.get_device(c,device_id)
         stopbits = ser.STOPBITS
         if data is None:
             return stopbits
         else:
             if data in stopbits:
-                ser.stopbits = data
+                ser.stopbits=data
             return int(ser.stopbits)
 
-    @setting(25, 'Timeout', data=[': Return immediately', 'v[s]: Timeout to use (max: 5min)'],
+    @setting(35, 'Timeout', data=[': Return immediately', 'v[s]: Timeout to use (max: 5min)'],
              returns=['v[s]: Timeout being used (0 for immediate return)'])
     def timeout(self, c, data=Value(0, 's')):
         """
         Sets a timeout for read operations.
         """
-        c['Timeout'] = min(data['s'], 300)
-        return Value(c['Timeout'], 's')
+        ser = self.get_device(c,device_id)
+        timeout_val=min(data['s'], 300)
+        ser.timeout(timeout_val)
+        return ser.timeout()
 
-    @setting(26, 'Serial Debug', status='b', returns='b')
-    def serialDebug(self, c, status=None):
+    @setting(36, 'Serial Debug', status='b', returns='b')
+    def serialDebug(self, c, device_id,status=None):
         """
         Sets/gets the debug setting.
         """
-        if status is not None:
-            c['Debug'] = status
-        return c['Debug']
+        ser = self.get_device(c,device_id)
+        if status:
+            ser.debug(status)
+        return ser.debug()
 
 
     # FLOW CONTROL
-    @setting(30, 'RTS', data=['b'], returns=['b'])
-    def RTS(self, c, data):
+    @setting(37, 'RTS', data=['b'], returns=['b'])
+    def RTS(self, c, device_id, data):
         """
         Sets the state of the RTS line.
         """
-        ser = self.getPort(c)
-        ser.rts = int(data)
+        ser = self.get_device(c,device_id)
+        ser.rts=int(data)
         return data
 
-    @setting(31, 'DTR', data=['b'], returns=['b'])
-    def DTR(self, c, data):
+    @setting(38, 'DTR', data=['b'], returns=['b'])
+    def DTR(self, c, device_id, data):
         """
         Sets the state of the DTR line.
         """
-        ser = self.getPort(c)
-        ser.dtr = int(data)
+        ser = self.get_device(c,device_id)
+        ser.dtr=int(data)
         return data
 
 
     # WRITE
-    @setting(40, 'Write', data=['s: Data to send', '*w: Byte-data to send'],
+    @setting(41, 'Write', data=['s: Data to send', '*w: Byte-data to send'],
              returns=['w: Bytes sent'])
-    def write(self, c, data):
+    def write(self, c, device_id, data):
         """
         Sends data over the port.
         """
-        ser = self.getPort(c)
+        
+        ser = get_device(c,device_id)
         # encode as needed
         if type(data) == str:
             data = data.encode()
@@ -314,12 +451,13 @@ class CSSerialServerSim(CSPollingServer):
             print("{:s}\tWRITE: {:s}".format(ser.name, data))
         return int(len(data))
 
-    @setting(41, 'Write Line', data=['s: Data to send'], returns=['w: Bytes sent'])
-    def write_line(self, c, data):
+    @setting(42, 'Write Line', data=['s: Data to send'], returns=['w: Bytes sent'])
+    def write_line(self, c, device_id, data,simulated=None):
         """
         Sends data over the port appending <CR><LF>.
         """
-        ser = self.getPort(c)
+        
+        ser = get_device(c,device_id)
         # encode as needed
         if type(data) == str:
             data = data.encode()
@@ -330,7 +468,7 @@ class CSSerialServerSim(CSPollingServer):
             print("{:s}\tWRITELINE: {:s}".format(ser.name, data))
         return int(len(data))
 
-    @setting(42, 'Pause', duration='v[s]: Time to pause', returns=[])
+    @setting(43, 'Pause', duration='v[s]: Time to pause', returns=[])
     def pause(self, c, duration):
         _ = yield deferLater(reactor, duration['s'], lambda: None)
         return
@@ -338,7 +476,7 @@ class CSSerialServerSim(CSPollingServer):
 
     # READ
     @inlineCallbacks
-    def deferredRead(self, ser, timeout, count=1):
+    def deferredRead(self, ser, timeout, count=1,simulated=None):
         """
         todo: document
         """
@@ -356,7 +494,7 @@ class CSSerialServerSim(CSPollingServer):
                     break
                 time.sleep(0.001)
             return d
-
+        
         # read until the timeout
         data = threads.deferToThread(doRead, count)
         timeout_object = []
@@ -375,8 +513,9 @@ class CSSerialServerSim(CSPollingServer):
         returnValue(r)
 
     @inlineCallbacks
-    def readSome(self, c, count=0):
-        ser = self.getPort(c)
+    def readSome(self, c, device_id, count=0, simulated=None):
+    
+        ser = self.get_device(c,device_id)
         if count == 0:
             returnValue(ser.read(10000))
 
@@ -399,9 +538,9 @@ class CSSerialServerSim(CSPollingServer):
             recd += r
         returnValue(recd)
 
-    @setting(50, 'Read', count=[': Read all bytes in buffer', 'w: Read this many bytes'],
+    @setting(51, 'Read', count=[': Read all bytes in buffer', 'w: Read this many bytes'],
              returns=['s: Received data'])
-    def read(self, c, count=0):
+    def read(self, c, device_id, count=0, simulated=None):
         """
         Read data from the port.
         If count = 0, reads the contents of the buffer (non-blocking). Otherwise,
@@ -411,32 +550,35 @@ class CSSerialServerSim(CSPollingServer):
         """
         ans = yield self.readSome(c, count)
         # debug output
-        ser_name = self.getPort(c).name
+       
+        ser_name = self.get_device(c,device_id).name
         if c['Debug']:
             print("{:s}\tREAD: {:s}".format(ser_name, ans))
         returnValue(ans)
 
-    @setting(51, 'Read as Words', data=[': Read all bytes in buffer', 'w: Read this many bytes'],
+    @setting(52, 'Read as Words', data=[': Read all bytes in buffer', 'w: Read this many bytes'],
              returns=['*w: Received data'])
-    def read_as_words(self, c, data=0):
+    def read_as_words(self, c, device_id, data=0, simulated=None):
         """
         Read data from the port.
         """
         ans = yield self.readSome(c, data)
         ans = [int(ord(x)) for x in ans]
         # debug output
-        ser_name = self.getPort(c).name
+        
+        ser_name = self.get_device(c,device_id).name
         if c['Debug']:
             print("{:s}\tREADASWORDS: {:s}".format(ser_name, ans))
         returnValue(ans)
 
-    @setting(52, 'Read Line', data=[': Read until LF, ignoring CRs', 's: Other delimiter to use'],
+    @setting(53, 'Read Line', data=[': Read until LF, ignoring CRs', 's: Other delimiter to use'],
              returns=['s: Received data'])
-    def read_line(self, c, data=''):
+    def read_line(self, c, device_id, data='',simulated=None):
         """
         Read data from the port, up to but not including the specified delimiter.
         """
-        ser = self.getPort(c)
+        
+        ser = self.get_device(c,device_id)
         timeout = c['Timeout']
         # set default end character if not specified
         if data:
@@ -466,52 +608,93 @@ class CSSerialServerSim(CSPollingServer):
 
     # BUFFER
     @setting(61, 'Flush Input', returns='')
-    def flush_input(self, c):
+    def flush_input(self, c,device_id, simulated=None):
         """
         Flush the input buffer.
         """
-        yield self.getPort(c).reset_input_buffer()
+        
+        ser = self.get_device(c,device_id)
+        yield ser.reset_input_buffer()
 
     @setting(62, 'Flush Output', returns='')
-    def flush_output(self, c):
+    def flush_output(self, c,device_id, simulated=None):
         """
         Flush the output buffer.
         """
-        ser = self.getPort(c)
+        
+        ser = self.get_device(c,device_id)
         yield ser.reset_output_buffer()
 
-    @setting(63, 'Buffer Size', size='i', returns='')
-    def buffer_size(self, c, size):
-        """
-        Set the serial buffer size.
-        Arguments:
-            size    (int)   : the serial buffer size.
-        """
-        yield self.getPort(c).set_buffer_size(size)
+
 
     @setting(64, 'Buffer Waiting Input', returns='i')
-    def input_waiting(self, c):
+    def input_waiting(self, c,device_id, simulated=None):
         """
         Get the number of bytes waiting at the input port.
         Returns:
             (int)   : the number of bytes waiting at the input port.
         """
-        ser = self.getPort(c)
-        val = ser.in_waiting
+        
+        ser = self.get_device(c,device_id)
+        val = ser.get_in_waiting()
         return val
 
     @setting(65, 'Buffer Waiting Output', returns='i')
-    def output_waiting(self, c):
+    def output_waiting(self, c,device_id, simulated=None):
         """
         Get the number of bytes waiting at the output port.
         Returns:
             (int)   : the number of bytes waiting at the output port.
         """
-        ser = self.getPort(c)
-        val = ser.out_waiting
+        
+        ser = self.get_device(c,device_id)
+        val = ser.get_out_waiting()
         return val
+        
+            
+#ATTACH HSS TO PORT
+    @setting(71, 'Add Hardware Simulating Server',port='s',simServer='s')
+    def addSimServer(self, c,port,simServer):
+        if port in self.simulatedServers:
+            #error
+        cli = self.client
+        servers = yield cli.manager.servers()
+    
+        for i in servers:
+            simMatch = 'simulation' in potMatch.lower()
+            serMatch=sim_server.lower() in potMatch.lower()
+            if simMatch and serMatch:
+                self.simulatedServers[port]=cli.servers[potMatch]
+                break
+                
+                
+    @setting(72, 'Remove Hardware Simulating Server',port='s')
+    def removeSimServer(self, c,port):
+        if port in self.simulatedServers:
+            self.simulatedServers[port].close()
+            del self.simulatedServers[port]
+        
+        
+        #if not assigned, error
+    
+    #PLUG/UNPLUG SIMULATED DEVICES
+    @setting(81, 'Add Simulated Device',port='s',device_id='s')
+    def addSimDevice(self, c,port,device_id):
+        if device_id not in self.serialServers[port].get_all_sim_device_list():
+            self.serialServers[port].add_sim_device(device_id)
+        #if not assigned, error
 
-
+    @setting(82, 'Remove Simulated Device')
+    def RemoveSimDevice(self, c,port='s',device_id='s'):
+        if device_id in self.serialServers[port].get_all_sim_device_list():
+            self.serialServers[port].remove_sim_device(device_id)
+        #if not assigned, error
+        
+    setting()
+    def listAllSimDevices(self,c):
+        for portstr,server in self.serialServers:
+        #get portstr, -> server.get_all_sim_device_list
+        
 __server__ = CSSerialServerSim()
 
 if __name__ == '__main__':

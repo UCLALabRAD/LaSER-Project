@@ -1,151 +1,11 @@
-# General class representing device server
-# that communicates with serial ports.
-
-# Handles writing, reading operations from
-# serial port, as well as connecting.
-
-# Subclass this if you are writing a device
-# server that communicates using serial port
-
-# Only connects to one port right now.
-# Might be cleaner to keep it this way.
-
-#===============================================================================
-#
-# 2011 - 01 - 26
-# 
-# Changed LabradServer.findSerial() to include serNode parameter.
-# Default behavior is to use self.serNode attribute.
-# 
-# Added LabradServer._matchSerial() to check for serial server match,
-# since we search both on initialization and on new server connecting.
-# 
-# Changed many docstrings to be more useful ( specify exceptions raised, etc. )
-# 
-# Added checkConnection decorator that modifies setting to raise exception
-# if self.ser is empty.
-#
-#===============================================================================
-
-#===============================================================================
-# 2011 - 01 - 31
-# 
-# Changed SerialDeviceServer.initSerial and SerialDeviceServer.SerialConnection.__init__ to include timeout parameter.
-# 
-# Got rid of checkConnection decorator, replaced with method SerialDeviceServer.checkConnection.
-#===============================================================================
-
-#===============================================================================
-# 2021 - 10 - 17
-#
-# Added COM port connection to SerialDeviceServer class instead of having all
-# subclasses write their own
-#===============================================================================
-
-#===============================================================================
-# 2021 - 11 - 10
-#
-# Added selectDevice and closeDevice to change which port we connect to on the fly.
-#
-# Removed initServer stuff such that servers don't connect to ports on startup.
-#===============================================================================
-
-#===============================================================================
-# 2021 - 11 - 15
-#
-# Fixed flushinput and flushoutput functions.
-#
-# Servers now flush input and output buffers on connection to device.
-#===============================================================================
-
-#===============================================================================
-# 2021 - 11 - 15
-#
-# Added read_all to ser for use with SLS.
-#===============================================================================
-
-#===============================================================================
-# 2021 - 11 - 22
-#
-# Servers now connect on startup if either node and port or node and regkey are
-# specified. If neither, server still starts up, just without a connection.
-#===============================================================================
-
-#===============================================================================
-# 2021 - 12 - 06
-#
-# Added comm lock setting to SerialConnection class to allow atomic read/write.
-#===============================================================================
-
-#===============================================================================
-# 2021 - 12 - 12
-#
-# selectDevice now accepts empty arguments, which returns the port and node
-# if a connection already exists, and creates a new connection if a
-# connection does not already exist and the port and node are already specified.
-#===============================================================================
-
-#===============================================================================
-# 2021 - 12 - 19
-#
-# Added debug setting, which makes serial bus server print r/w.
-#
-# Direct serial communication settings can now choose EOL/length of read.
-#===============================================================================
-
-#===============================================================================
-# 2022 - 01 - 21
-#
-# Added new setting "device_info" which returns node and port if a connection
-# is opened.
-#
-# Empty call to device_select now does default connection instead.
-#===============================================================================
-
-#===============================================================================
-# 2022 - 03 - 12
-#
-# Added back SelectPortFromReg function that gets default values
-# from registry before looking to hardcoded server file values.
-#
-# Removed checkConnection function since it's a one-liner.
-#
-# Made serverConnected signal function call initSerial upon
-# connection of required serial bus server.
-#===============================================================================
-
 from twisted.internet.defer import returnValue, inlineCallbacks, DeferredLock
 
 from labrad.errors import Error
 from labrad.server import LabradServer, setting
 
-__all__ = ["SerialDeviceError", "SerialConnectionError", "CSSerialDeviceServerSim"]
+__all__ = ["CSSerialDeviceServerSim"]
 
-
-# ERROR CLASSES
-class SerialDeviceError(Exception):
-
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
-
-
-class SerialConnectionError(Exception):
-
-    errorDict = {0: 'Could not find serial server in list',
-                 1: 'Could not connect to a serial device',
-                 2: 'Attempting to use serial connection when not connected'}
-
-    def __init__(self, code):
-        self.code = code
-
-    def __str__(self):
-        return self.errorDict[self.code]
-
-
-# DEVICE CLASS
+        
 class CSSerialDeviceServerSim(LabradServer):
     """
     Base class for serial device servers.
@@ -162,12 +22,12 @@ class CSSerialDeviceServerSim(LabradServer):
     """
 
     # node parameters
-    name = 'CSSerialDeviceSim'
+    name = 'CSSerialDeviceServerSim'
     port = None
     regKey = None
     serNode = None
 
-    # serial connection parameters
+    # hardware serial connection parameters
     timeout = None
     baudrate = None
     bytesize = None
@@ -178,48 +38,62 @@ class CSSerialDeviceServerSim(LabradServer):
     
     
     correct_device_check=("id?","piezo")
-
+    
+    
     class SerialConnection(object):
         """
         Wrapper for our server's client connection to the serial server.
         @raise labrad.types.Error: Error in opening serial connection
         """
         def __init__(self, ser, port, **kwargs):
-            # parse kwargs
-            timeout = kwargs.get('timeout')
-            baudrate = kwargs.get('baudrate')
-            bytesize = kwargs.get('bytesize')
-            parity = kwargs.get('parity')
-            debug = kwargs.get('debug')
-            # serial parameters
-            ser.open(port,self.simulated)
-           
-            if timeout is not None: ser.timeout(timeout)
-            if baudrate is not None: ser.baudrate(baudrate)
-            if bytesize is not None: ser.bytesize(bytesize)
-            if parity is not None: ser.parity(parity)
-            if debug is not None: ser.serial_debug(debug)
-            # serial r/w
-            self.write = lambda s: ser.write(s)
-            self.write_line = lambda s: ser.write_line(s)
-            self.read = lambda x = 0: ser.read(x)
-            self.read_line = lambda x = '': ser.read_line(x)
-            self.read_as_words = lambda x = 0: ser.read_as_words(x)
-            # other
-            self.close = lambda: ser.close()
-            self.flush_input = lambda: ser.flush_input()
-            self.flush_output = lambda: ser.flush_output()
+        
+            
+            c['device_id']=ser.open_port(port,**kwargs)
+            
             self.ID = ser.ID
-            self.debug = lambda b=None: ser.serial_debug(b)
-            # comm lock
+            
+            
+            # serial r/w
+            self.write = lambda device_id, s: ser.write(device_id,s)
+            self.write_line = lambda device_id, s: ser.write_line(device_id,s)
+            self.read = lambda device_id, x = 0: ser.read(device_id, x)
+            self.read_line = lambda device_id, x = '': ser.read_line(device_id, x)
+            self.read_as_words = lambda device_id, x = 0: ser.read_as_words(device_id, x)
+            
+            
+            # buffer
+            self.buffer_size = lambda device_id, size: ser.buffer_size(device_id, size)
+            self.buffer_input_waiting = lambda device_id: ser.input_waiting(device_id)
+            self.buffer_output_waiting = lambda device_id: ser.out_waiting(device_id)
+            self.flush_input = lambda device_id: ser.flush_input(device_id)
+            self.flush_output = lambda device_id: ser.flush_output(device_id)
+            
+            
+            # device connection
+            self.phys_device_connect=lambda : ser.phys_device_connect
+            self.sim_device_connect=lambda device_id: ser.sim_device_connect(device_id)
+            self.device_disconnect = lambda ser.device_disconnect(c['device_id'])
+            self.get_conn_device_list= lambda: ser.get_conn_device_list
+            self.get_all_device_list= lambda: ser.get_all_device_list
+            self.close_port= lambda: ser.close_port
+
+            
             self.comm_lock = DeferredLock()
             self.acquire = lambda: self.comm_lock.acquire()
             self.release = lambda: self.comm_lock.release()
-            # buffer
-            self.buffer_size = lambda size: ser.buffer_size(size)
-            self.buffer_input_waiting = lambda: ser.in_waiting
-            self.buffer_output_waiting = lambda: ser.out_waiting
-
+            
+            
+            
+            self.timeout=lambda timeout: ser.timeout(timeout)
+            self.baudrate=lambda baudrate: ser.baudrate(baudrate)
+            self.bytesize=lambda bytesize: ser.bytesize(bytesize)
+            self.parity=lambda parity: ser.parity(parity)
+            self.debug=lambda debug: ser.debug(debug)
+            
+            
+            
+            
+            
 
     # SETUP
     @inlineCallbacks
@@ -235,26 +109,17 @@ class CSSerialDeviceServerSim(LabradServer):
                 self.port = port
             except Exception as e:
                 print('Unable to find default node and port in registry. Using hard-coded values if they exist.')
+        
         # open connection on startup if default node and port are specified
-        if self.serNode and self.port:
+        if self.serNode:
             print('Default node and port specified. Connecting to device on startup.')
             try:
                 serStr = yield self.findSerial(self.serNode)
                 yield self.initSerial(serStr, self.port, baudrate=self.baudrate, timeout=self.timeout,
                                       bytesize=self.bytesize, parity=self.parity)
-            except SerialConnectionError as e:
-                self.ser = None
-                if e.code == 0:
-                    print('Could not find serial server for node: %s' % self.serNode)
-                    print('Please start correct serial server')
-                elif e.code == 1:
-                    print('Error opening serial connection')
-                else:
-                    raise Exception('Unknown connection error')
             except Error:
-                # maybe check for serialutil.SerialException?
-                print('Unknown connection error')
-                raise
+
+
 
     @inlineCallbacks
     def stopServer(self):
@@ -272,7 +137,6 @@ class CSSerialDeviceServerSim(LabradServer):
         """
         Finds default node and port values in
         the registry given the directory name.
-
         @param regKey: String used to find key match.
         @return: Name of port
         @raise PortRegError: Error code 0.  Registry does not have correct directory structure (['','Ports']).
@@ -289,6 +153,10 @@ class CSSerialDeviceServerSim(LabradServer):
             returnValue((node, port))
         except Exception as e:
             yield reg.cd(tmp)
+            if node:
+                returnValue((node,None))
+            
+            
 
 
     # SERIAL
@@ -323,17 +191,16 @@ class CSSerialDeviceServerSim(LabradServer):
             yield self.ser.flush_output()
             print('Serial connection opened.')
         except Error:
-            self.ser = None
-            raise SerialConnectionError(1)
+            
+
 
     @inlineCallbacks
     def findSerial(self, serNode=None):
         """
         Find appropriate serial server.
-
         @param serNode: Name of labrad node possessing desired serial port
         @return: Key of serial server
-        @raise SerialConnectionError: Error code 0.  Could not find desired serial server.
+        @raise SerialConnectionError: Error code 0.  Could not find desired serial server in registry.
         """
         if not serNode:
             serNode = self.serNode
@@ -349,12 +216,11 @@ class CSSerialDeviceServerSim(LabradServer):
     def _matchSerial(serNode, potMatch):
         """
         Checks if server name is the correct serial server.
-
         @param serNode: Name of node of desired serial server
         @param potMatch: Server name of potential match
         @return: boolean indicating comparison result
         """
-        serMatch = ('serial' in potMatch.lower()) and ('with' in potMatch.lower())
+        serMatch = 'serial' in potMatch.lower()
         nodeMatch = serNode.lower() in potMatch.lower()
         return serMatch and nodeMatch
 
@@ -367,9 +233,9 @@ class CSSerialDeviceServerSim(LabradServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-        if (self.ser is None) and (None not in (self.port, self.serNode)) and (self._matchSerial(self.serNode, name)):
+        if (self.ser is None) and (self.serNode is not None) and (self._matchSerial(self.serNode, name)):
             print(name, 'connected after we connected.')
-            yield self.deviceSelect(None)
+            yield self.port_select(None)
 
     def serverDisconnected(self, ID, name):
         """
@@ -382,11 +248,10 @@ class CSSerialDeviceServerSim(LabradServer):
 
     # SETTINGS
 
-    #TODO: simulateddeviceSelect
-    #simulated field needed?
-        # DEVICE SELECTION
-    @setting(111111, 'Device Select', node='s', port='s', returns=['', '(ss)'])
-    def deviceSelect(self, c, node=None, port=None):
+    #SELECTING PORT
+        
+    @setting(11, 'Port Select', node='s', port='s', returns=['', '(ss)'])
+    def port_select(self, c, node=None, port=None):
         """
         Attempt to connect to serial device on the given node and port.
         Arguments:
@@ -395,6 +260,7 @@ class CSSerialDeviceServerSim(LabradServer):
         Returns:
                     (str,str): the connected node and port (empty if no connection)
         """
+    
         # do nothing if device is already selected
         if self.ser:
             Exception('A serial device is already opened.')
@@ -414,36 +280,21 @@ class CSSerialDeviceServerSim(LabradServer):
             serStr = yield self.findSerial(self.serNode)
             yield self.initSerial(serStr, self.port, baudrate=self.baudrate, timeout=self.timeout,
                                   bytesize=self.bytesize, parity=self.parity)
+        
         except SerialConnectionError as e:
-            self.ser = None
-            if e.code == 0:
-                print('Could not find serial server for node: %s' % self.serNode)
-                print('Please start correct serial server')
-            elif e.code == 1:
-                print('Error opening serial connection')
-            else:
-                print('Unknown connection error')
-            raise e
-        except Exception as e:
-            self.ser = None
-            print(e)
-        else:
-            return (self.serNode, self.port)
+        returnValue((node,port))
+        
+        
+    @setting(12, 'Close Port', returns='')
+    def close_port(self, c):
+        yield self.ser.acquire()
+        self.ser.close_port()
+        self.ser.release()
+        self.ser=None
+        
 
-    @setting(111112, 'Device Close', returns='')
-    def deviceClose(self, c):
-        """
-        Closes the current serial device.
-        """
-        if self.ser:
-            self.ser.close()
-            self.ser = None
-            print('Serial connection closed.')
-        else:
-            raise Exception('No device selected.')
-
-    @setting(111113, 'Connection Info', returns='(ss)')
-    def connectionInfo(self, c):
+    @setting(13, 'Port Info', returns='(ss)')
+    def port_info(self, c):
         """
         Returns the currently connected serial device's
         node and port.
@@ -451,32 +302,19 @@ class CSSerialDeviceServerSim(LabradServer):
             (str)   : the node
             (str)   : the port
         """
+        
+        
         if self.ser:
             return (self.serNode, self.port)
         else:
             return ("", "")
+            
+    
 
-    @setting(111115, 'Check that device on port is correct', returns='(bs)')
-    def checkCorrectHardware(self, c):
-        """
         
-        Returns:
-            (bool)   :
-            (str)   :
-        """
-        if self.ser is None:
-            Exception('There is not currently a serial connection. There\'s no device to check.')
-        else:
-            yield self.ser.acquire()
-            yield self.ser.write(self.correct_device_check[0])
-            resp=yield self.ser.read()
-            is_match = correct_device_check[1].lower() in resp.lower()
-            self.ser.release()
-            returnValue((is_match,resp))
-        
+   
     # DIRECT SERIAL COMMUNICATION
-    @setting(222223, 'Serial Query', data='s', stop=['i: read a given number of characters',
-                                                     's: read until the given character'], returns='s')
+    @setting(21, 'Serial Query', data='s', stop=['i: read a given number of characters', 's: read until the given character'], returns='s')
     def serial_query(self, c, data, stop=None):
         """
         Write any string and read the response.
@@ -497,7 +335,7 @@ class CSSerialDeviceServerSim(LabradServer):
         self.ser.release()
         returnValue(resp)
 
-    @setting(222224, 'Serial Write', data='s', returns='')
+    @setting(22, 'Serial Write', data='s', returns='')
     def serial_write(self, c, data):
         """
         Directly write to the serial device.
@@ -508,8 +346,7 @@ class CSSerialDeviceServerSim(LabradServer):
         yield self.ser.write(data)
         self.ser.release()
 
-    @setting(222225, 'Serial Read', stop=['i: read a given number of characters',
-                                          's: read until the given character'], returns='s')
+    @setting(23, 'Serial Read', stop=['i: read a given number of characters', 's: read until the given character'], returns='s')
     def serial_read(self, c, stop=None):
         """
         Directly read the serial buffer.
@@ -528,7 +365,7 @@ class CSSerialDeviceServerSim(LabradServer):
 
 
     # HELPER
-    @setting(222231, 'Serial Flush', returns='')
+    @setting(24, 'Serial Flush', returns='')
     def serial_flush(self, c):
         """
         Flush the serial input and output buffers.
@@ -538,7 +375,7 @@ class CSSerialDeviceServerSim(LabradServer):
         yield self.ser.flush_output()
         self.ser.release()
 
-    @setting(222232, 'Serial Release', returns='')
+    @setting(25, 'Serial Release', returns='')
     def serial_release(self, c):
         """
         Try to release the serial comm lock in case
@@ -548,9 +385,123 @@ class CSSerialDeviceServerSim(LabradServer):
 
 
     # DEBUGGING
-    @setting(222241, 'Serial Debug', status='b', returns='b')
-    def serialDebug(self, c, status=None):
+    @setting(26, 'Serial Debug', status='b', returns='b')
+    def serial_debug(self, c, status=None):
         """
         Tells the serial bus server to print input/output.
         """
         return self.ser.debug(status)
+
+
+#CONNECTING TO DEVICES
+    
+    
+    
+    @setting(31,'Connect Physical Device',returns='')
+    def phys_device_connect(self, c):
+        try:
+            yield self.ser.acquire()
+            yield self.ser.phys_device_connect()
+            self.ser.release()
+            c['device_id']='0'
+            if timeout is not None: ser.timeout(timeout)
+            if baudrate is not None: ser.baudrate(baudrate)
+            if bytesize is not None: ser.bytesize(bytesize)
+            if parity is not None: ser.parity(parity)
+            if debug is not None: ser.serialDebug(debug)
+        except:
+        #should be in serr conn
+        
+        
+        
+    @setting(32, 'Connect Simulated Device', device_id='s', returns='')
+    def sim_device_connect(self, c, device_id):
+        try:
+            yield self.ser.acquire()
+            yield self.ser.sim_device_connect(device_id)
+            self.ser.release()
+            c['device_id']=device_id
+            if timeout is not None: ser.timeout(timeout)
+            if baudrate is not None: ser.baudrate(baudrate)
+            if bytesize is not None: ser.bytesize(bytesize)
+            if parity is not None: ser.parity(parity)
+            if debug is not None: ser.serial_debug(debug)
+        except:
+        #should be in serr conn
+
+
+
+    @setting(33, 'Disconnect from Currently Selected Device',returns='')
+    def device_disconnect(self, c):
+        try:
+            yield self.ser.acquire()
+            yield self.ser.device_disconnect(c)
+            self.ser.release()
+            c['device_id']=None
+        except:
+        #should be in serr conn
+        
+        
+        
+    @setting(34, 'List Connected Devices', returns='*s')
+    def list_conn_devices(self,c):
+        yield self.ser.acquire()
+        device_list=yield self.ser.get_conn_device_list():
+        self.ser.release()
+        returnValue(device_list)
+
+
+
+    #should be in serr conn
+    @setting(35, 'List All Available Devices', returns='*s')
+    def list_all_devices(self,c):
+        yield self.ser.acquire()
+        device_list= yield self.ser.get_all_device_list():
+        self.ser.release()
+        returnValue(device_list)
+
+
+
+
+
+
+#SELECTING DEVICE
+    @setting(41,'Select the Physical Device Connected to Port',returns='')
+    def select_physical_device(self,c):
+        yield self.ser.acquire()
+        if device_id in self.ser.get_conn_device_list():
+            c['device_id']='0'
+        self.ser.release()
+    
+    
+    @setting(42,'Select a Simulated Device in HSS Corresponding to Port',device_id='s',returns='')
+    def select_sim_device(self,c,device_id='1'):
+        yield self.ser.acquire()
+        if device_id in self.ser.get_conn_device_list():
+            c['device_id']=device_id
+        self.ser.release()
+
+        
+        
+
+
+    
+#    @setting(111115, '', returns='(bs)')
+#    def checkCorrectHardware(self, c):
+#        """
+        
+#        Returns:
+#            (bool)   :
+#            (str)   :
+#        """
+#        if self.ser is None:
+#            Exception('There is not currently a serial connection. There\'s no device to check.')
+#        else:
+#            yield self.ser.acquire()
+#            yield self.ser.write(self.correct_device_check[0])
+#            resp=yield self.ser.read()
+#            is_match = correct_device_check[1].lower() in resp.lower()
+#            self.ser.release()
+#            returnValue((is_match,resp))
+        
+        
