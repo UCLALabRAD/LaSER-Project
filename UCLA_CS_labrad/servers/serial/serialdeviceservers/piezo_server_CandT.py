@@ -20,13 +20,13 @@ from labrad.units import WithUnit
 from labrad.server import setting, Signal, inlineCallbacks
 
 from twisted.internet.defer import returnValue
-from UCLA_CS_labrad.servers.serial.csserialdeviceserverwithsimulation import CSSerialDeviceServerSim
-from UCLA_CS_labrad.servers.serial.csserialdeviceservernosimulation import CSSerialDeviceServerNoSim
+from UCLA_CS_labrad.servers.serial.CSSerialDeviceServer import CSSerialDeviceServer
+
 
 TERMINATOR = '\r\n'
 
 
-class CSPiezoServer(CSSerialDeviceServerNoSim):
+class CSPiezoServer(CSSerialDeviceServer):
     """
     Communicates with the AMO3 box for control of piezo voltages.
     """
@@ -35,10 +35,14 @@ class CSPiezoServer(CSSerialDeviceServerNoSim):
     regKey = 'CSPiezoServer'
     serNode = 'penny'
     port = 'COM4'
-
     timeout = WithUnit(3.0, 's')
-    baudrate = 38400
-
+    baudrate = 1
+    bytesize=2
+    parity=3
+    stopbits=None
+    rts=True
+    dtr=False
+        
     input_for_device_info="id?"
     
     input_for_device_commands_list="help"
