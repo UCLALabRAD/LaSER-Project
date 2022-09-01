@@ -55,128 +55,136 @@ class CSSerialServerSim(CSPollingServer):
         """
         def __init__(self, hardware_simulating_server, port,ctxt):
         
-
             self.ser=hardware_simulating_server
-            self.port=port
         
             self.name=hardware_simulating_server.name+" Simulated Device " + port
             
-            cli=self.client
             self.ctxt= ctxt
             
-            
-        
-            self.read= lambda data: self.ser.read(self.ctxt, bytes)
-            self.write= lambda data: self.ser.write(self.ctxt, data)
+            self.ser.select_device(port,context=self.ctxt)
             
             
-            
-            
-            self.reset_input_buffer= lambda: self.ser.reset_input_buffer(self.ctxt)
+            self.reset_input_buffer= lambda: self.ser.reset_input_buffer(context=self.ctxt)
                 
-            self.reset_output_buffer= lambda: self.ser.reset_output_buffer(self.ctxt)
+            self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
             
             self.set_buffer_size= lambda size: None
-            
-            
-            @property
-            def in_waiting(self):
-                val= yield self.ser.get_in_waiting(self.ctxt)
-                returnValue(val)
 
-            @property
-            def out_waiting(self):
-                val= yield self.ser.get_out_waiting(self.ctxt)
-                returnValue(val)
             
             self.open = lambda: None
             self.close = lambda: None
             
-            
-            
-            
-            
-            @property
-            @inlineCallbacks
-            def baudrate(self):
-                resp=yield self.ser.baudrate(self.ctxt,None)
-                returnValue(resp)
-             
-            @baudrate.setter
-            @inlineCallbacks
-            def baudrate(self, val):
-                yield self.ser.baudrate(self.ctxt,val)
-            
-                
-            @property
-            @inlineCallbacks
-            def bytesize(self):
-                resp=yield self.ser.bytesize(self.ctxt,None)
-                returnValue(resp)
-                
-                
-            @bytesize.setter
-            @inlineCallbacks
-            def bytesize(self, val):
-                yield self.ser.bytesize(self.ctxt,val)
 
-            @property
-            @inlineCallbacks
-            def parity(self):
-                resp=yield self.ser.get_parity(self.ctxt,None)
-                returnValue(resp)
-                
-                
-            @parity.setter
-            @inlineCallbacks
-            def parity(self, val):
-                yield self.ser.set_parity(self.ctxt,val)
-
-
-            @property
-            @inlineCallbacks
-            def stopbits(self):
-                resp=yield self.ser.stopbits(self.ctxt,None)
-                returnValue(resp)
-                
-            @stopbits.setter
-            @inlineCallbacks
-            def stopbits(self, val):
-                yield self.ser.stopbits(self.ctxt,val)
-                
-
-
-            @rts.setter
-            @inlineCallbacks
-            def rts(self, val):
-                yield self.ser.rts(self.ctxt,val)
-                
-
-            @dtr.setter
-            @inlineCallbacks
-            def dtr(self, val):
-                yield self.ser.dtr(self.ctxt,val)
-
-                
             self.timeout=1
             
             
             
+        @property
+        @inlineCallbacks
+        def in_waiting(self):
+            val= yield self.ser.get_in_waiting(context=self.ctxt)
+            returnValue(val)
 
+        @property
+        @inlineCallbacks
+        def out_waiting(self):
+            val= yield self.ser.get_out_waiting(context=self.ctxt)
+            returnValue(val)
             
+        @inlineCallbacks
+        def read(self,bytes):
+            resp= yield self.ser.read(bytes, context=self.ctxt)
+            returnValue(resp.encode())
+                
+        @inlineCallbacks
+        def write(self,data):
+            yield self.ser.write(data, context=self.ctxt)
 
+
+        @property
+        @inlineCallbacks
+        def baudrate(self):
+            resp=yield self.ser.baudrate(None,context=self.ctxt, )
+            returnValue(resp)
+             
+        @baudrate.setter
+        @inlineCallbacks
+        def baudrate(self, val):
+            yield self.ser.baudrate(val, context=self.ctxt)
             
+                
+        @property
+        @inlineCallbacks
+        def bytesize(self):
+            resp=yield self.ser.bytesize(None, context=self.ctxt)
+            returnValue(resp)
+                
+                
+        @bytesize.setter
+        @inlineCallbacks
+        def bytesize(self, val):
+            yield self.ser.bytesize(val, context=self.ctxt)
+
+        @property
+        @inlineCallbacks
+        def parity(self):
+            resp=yield self.ser.parity(None, context=self.ctxt)
+            returnValue(resp)
+                
+                
+        @parity.setter
+        @inlineCallbacks
+        def parity(self, val):
+            yield self.ser.parity(val, context=self.ctxt)
 
 
-    #@inlineCallbacks
+        @property
+        @inlineCallbacks
+        def stopbits(self):
+            resp=yield self.ser.stopbits(None, context=self.ctxt)
+            returnValue(resp)
+                
+        @stopbits.setter
+        @inlineCallbacks
+        def stopbits(self, val):
+            yield self.ser.stopbits(val, context=self.ctxt)
+             
+        @property
+        def dtr(self):
+            pass
+
+        
+        @dtr.setter
+        @inlineCallbacks
+        def dtr(self, val):
+            yield self.ser.dtr(val, context=self.ctxt)
+
+        
+        @property
+        def rts(self):
+            pass
+
+        @rts.setter
+        @inlineCallbacks
+        def rts(self, val):
+            yield self.ser.rts(val, context=self.ctxt)
+                
+
+
+
+
+    @inlineCallbacks
     def initServer(self):
         super().initServer()
-        for HSS in [HSS for name,HSS in self.client.servers if 'simulating server' in name.lower()]:
+        self.sim_devices=[]
+        servers=yield self.client.manager.servers()
+        for HSS in [self.client.servers[HSS_name] for _,HSS_name in servers if 'simulating server' in HSS_name.lower()]:
+            existing_device_list=yield HSS.get_devices_list()
+            self.sim_devices+=[SerialDevice(port,None,HSS) for port in existing_device_list]
             yield HSS.signal__simulated_device_added(8675309)
             yield HSS.signal__simulated_device_removed(8675310)
             yield HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
             yield HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
-        self.sim_devices=[]
         self.enumerate_serial_pyserial()
 
     def _poll(self):
@@ -289,7 +297,7 @@ class CSSerialServerSim(CSPollingServer):
 
     def create_serial_connection(self,serial_device):
         if serial_device.HSS:
-            return DeviceConnection(serial_device.name,serial_device.HSS,self.client.context())
+            return self.DeviceConnection(serial_device.HSS,serial_device.name,self.client.context())
         else:
             return Serial(serial_device.name)
                 
@@ -303,9 +311,9 @@ class CSSerialServerSim(CSPollingServer):
         """
         ser = self.getPort(c)
         if data:
-            yield (ser.baudrate=data)
-        resp= int((yield ser.baudrate))
-        returnValue(resp)
+            ser.baudrate=data
+        resp= ser.baudrate
+        return resp
         
     @setting(32, 'Bytesize', data=[': Query current bytesize', 'w: Set bytesize'], returns='w: Selected bytesize')
     def bytesize(self, c, data=None):
@@ -315,9 +323,9 @@ class CSSerialServerSim(CSPollingServer):
         ser = self.getPort(c)
 
         if data:
-            yield (ser.bytesize=data)
-        resp= int((yield ser.bytesize))
-        returnValue(resp)
+            ser.bytesize=data
+        resp= ser.bytesize
+        return resp
         
     @setting(33, 'Parity', data=[': Query current parity', 'w: Set parity'], returns='w: Selected parity')
     def parity(self, c, data=None):
@@ -327,9 +335,10 @@ class CSSerialServerSim(CSPollingServer):
         ser = self.getPort(c)
 
         if data:
-            yield (ser.parity=data)
-        resp= int((yield ser.parity))
-        returnValue(resp)
+            ser.parity=data
+        resp= ser.parity
+        resp.addCallback(lambda x: int(x))
+        return resp
         
     @setting(34, 'Stopbits', data=[': Query current stopbits', 'w: Set stopbits'], returns='w: Selected stopbits')
     def stopbits(self, c, data=None):
@@ -339,9 +348,9 @@ class CSSerialServerSim(CSPollingServer):
         ser = self.getPort(c)
 
         if data:
-            yield (ser.stopbits=data)
-        resp= int((yield ser.stopbits))
-        returnValue(resp)
+            ser.stopbits=data
+        resp.addCallback(lambda x: int(x))
+        return resp
         
         
     @setting(35, 'Timeout', data=[': Return immediately', 'v[s]: Timeout to use (max: 5min)'],
@@ -353,7 +362,7 @@ class CSSerialServerSim(CSPollingServer):
         ser = self.getPort(c)
         timeout_val=min(data['s'], 300)
         ser.timeout=timeout_val
-        return ser.timeout()
+        return Value(ser.timeout, 's')
 
 
     # FLOW CONTROL
@@ -363,7 +372,7 @@ class CSSerialServerSim(CSPollingServer):
         Sets the state of the RTS line.
         """
         ser = self.getPort(c)
-        yield (ser.rts=int(data))
+        ser.rts=int(data)
         return data
 
     @setting(38, 'DTR', data=['b'], returns=['b'])
@@ -372,7 +381,7 @@ class CSSerialServerSim(CSPollingServer):
         Sets the state of the DTR line.
         """
         ser = self.getPort(c)
-        yield (ser.dtr=int(data))
+        ser.dtr=int(data)
         return data
 
 
@@ -384,7 +393,7 @@ class CSSerialServerSim(CSPollingServer):
         Sends data over the port.
         """
         
-        ser = getPort(c)
+        ser = self.getPort(c)
         # encode as needed
         if type(data) == str:
             data = data.encode()
@@ -398,7 +407,7 @@ class CSSerialServerSim(CSPollingServer):
         Sends data over the port appending <CR><LF>.
         """
         
-        ser = getPort(c)
+        ser = self.getPort(c)
         # encode as needed
         if type(data) == str:
             data = data.encode()
@@ -421,7 +430,8 @@ class CSSerialServerSim(CSPollingServer):
         """
         # killit stops the read
         killit = False
-
+        
+        @inlineCallbacks
         def doRead(count):
             """
             Waits until it reads <count> characters or is told to stop.
@@ -435,6 +445,7 @@ class CSSerialServerSim(CSPollingServer):
             returnValue(d)
         
         # read until the timeout
+        
         data = threads.deferToThread(doRead, count)
         timeout_object = []
         start_time = time.time()
@@ -456,13 +467,14 @@ class CSSerialServerSim(CSPollingServer):
     
         ser = self.getPort(c)
         if count == 0:
-            res=yield ser.read(10000)
-            returnValue(res)
+            resp=yield ser.read(10000)
+            returnValue(resp)
 
         timeout = ser.timeout
         if timeout == 0:
-            res=yield ser.read(count)
-            returnValue(res)
+            resp=yield ser.read(count)
+            returnValue(resp)
+            
 
         # read until we either hit timeout or meet character count
         recd = b''
@@ -473,8 +485,8 @@ class CSSerialServerSim(CSPollingServer):
             if r == b'':
                 r = yield self.deferredRead(ser, timeout, count - len(recd))
                 if r == b'':
-                    yield ser.close()
-                    yield ser.open()
+                    ser.close()
+                    ser.open()
                     break
             recd += r
         returnValue(recd)
@@ -490,7 +502,7 @@ class CSSerialServerSim(CSPollingServer):
             count:   bytes to read.
         """
         ans = yield self.readSome(c, count)
-
+        
         returnValue(ans)
 
     @setting(52, 'Read as Words', data=[': Read all bytes in buffer', 'w: Read this many bytes'],
@@ -527,7 +539,7 @@ class CSSerialServerSim(CSPollingServer):
 
         recd = b''
         while True:
-            r = yield ser.read(1) #TODO:TIMEOUT STUFF HERE
+            r = yield ser.read(1)
             # only try a deferred read if there is a timeout
             if r == b'' and timeout > 0:
                 r = yield self.deferredRead(ser, timeout)
@@ -580,8 +592,8 @@ class CSSerialServerSim(CSPollingServer):
         """
         
         ser = self.getPort(c)
-        yield (val = ser.in_waiting)
-        returnValue(val)
+        val = ser.in_waiting
+        return val
         
         
     @setting(65, 'Buffer Waiting Output', returns='i')
@@ -593,8 +605,8 @@ class CSSerialServerSim(CSPollingServer):
         """
         
         ser = self.getPort(c)
-        yield (val = ser.out_waiting)
-        returnValue(val)
+        val = ser.out_waiting
+        return val
         
             
 
@@ -607,13 +619,14 @@ class CSSerialServerSim(CSPollingServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-                    
+        
         cli=self.client
         yield cli.refresh()
+        servers=yield self.client.manager.servers()
         if "simulating server" in name.lower():
-            for key,server_obj in self.client.servers
-                if self.match_HSS(name,key):
-                    HSS=self.client.servers[key]
+            for _,server_name in servers:
+                if server_name==name:
+                    HSS=self.client.servers[server_name]
                     yield HSS.signal__simulated_device_added(8675309)
                     yield HSS.signal__simulated_device_removed(8675310)
                     yield HSS.addListener(listener=self.simDeviceAdded, source=None, ID=8675309)
@@ -621,39 +634,27 @@ class CSSerialServerSim(CSPollingServer):
                     break
             
     # SIGNALS
-    @inlineCallbacks
     def serverDisconnected(self, ID, name):
-        cli=self.client
-        yield cli.refresh()
         if "simulating server" in name.lower():
-            for key,server_obj in self.client.servers
-                if self.match_HSS(name,key):
-                    HSS=self.client.servers[key]
-                    self.sim_devices=[device for device in self.sim_devices if device.HSS is not HSS]
-                    break
+            self.sim_devices=[device for device in self.sim_devices if device.HSS.name != name]
+        
             
-        
-
-
-    def match_HSS(self, connected_server, potMatch):
-        return (potMatch==[char.lower() if char in string.ascii_letters else '_' for char in connected_server])
-        
-        
+    
 
     @inlineCallbacks
     def simDeviceAdded(self, c,data):
-        port, HSS_name=data
+        HSS_name, port=data
         cli=self.client
         servers=yield cli.manager.servers()
         correct_server=None
-        for server in servers:
-            if self.match_HSS(server,HSS_name):
-                correct_server=server
+        for _,server_name in servers:
+            if server_name==HSS_name:
+                correct_server=server_name
                 break
         HSS=cli.servers[correct_server]
-        self.sim_devices.add(SerialDevice(port_string,None, HSS))
+        self.sim_devices.append(SerialDevice(port,None, HSS))
    
-    @inlineCallbacks
+   
     def simDeviceRemoved(self, c, port_string):
         for device in self.sim_devices:
             if device.name==port_string:

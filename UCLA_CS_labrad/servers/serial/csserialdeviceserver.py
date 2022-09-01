@@ -119,6 +119,7 @@ from twisted.internet.defer import returnValue, inlineCallbacks, DeferredLock
 from labrad.errors import Error
 from labrad.server import LabradServer, setting
 
+
 __all__ = ["SerialDeviceError", "SerialConnectionError", "CSSerialDeviceServer"]
 
 
@@ -234,7 +235,7 @@ class CSSerialDeviceServer(LabradServer):
                 self.port = port
             except Exception as e:
                 print('Unable to find default node and port in registry. Using hard-coded values if they exist.')
-        # open connection on startup if default node and port are specified
+         #open connection on startup if default node and port are specified
         if self.serNode and self.port:
             print('Default node and port specified. Connecting to device on startup.')
             try:
@@ -381,8 +382,7 @@ class CSSerialDeviceServer(LabradServer):
 
     # SETTINGS
 
-    #TODO: simulateddeviceSelect
-    #simulated field needed?
+
         # DEVICE SELECTION
     @setting(111111, 'Device Select', node='s', port='s', returns=['', '(ss)'])
     def deviceSelect(self, c, node=None, port=None):

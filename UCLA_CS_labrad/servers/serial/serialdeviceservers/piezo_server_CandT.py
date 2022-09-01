@@ -20,7 +20,7 @@ from labrad.units import WithUnit
 from labrad.server import setting, Signal, inlineCallbacks
 
 from twisted.internet.defer import returnValue
-from UCLA_CS_labrad.servers.serial.CSSerialDeviceServer import CSSerialDeviceServer
+from UCLA_CS_labrad.servers.serial.csserialdeviceserver import *
 
 
 TERMINATOR = '\r\n'
@@ -33,8 +33,8 @@ class CSPiezoServer(CSSerialDeviceServer):
 
     name = 'CS Piezo Server'
     regKey = 'CSPiezoServer'
-    serNode = 'penny'
-    port = 'COM4'
+    serNode = 'landons-macbook-pro.local'
+    port = 'SIMCOM3'
     timeout = WithUnit(3.0, 's')
     baudrate = 1
     bytesize=2

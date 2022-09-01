@@ -60,7 +60,6 @@ class CSHardwareSimulatingServer(LabradServer):
     
     device_added=Signal(565656,'Signal: Simulated Device Added','(s,s)')
     device_removed=Signal(676767,'Signal: Simulated Device Removed','s')
-    
     def initServer(self):
         super().initServer()
         self.devices={}
@@ -71,7 +70,7 @@ class CSHardwareSimulatingServer(LabradServer):
         if 'Port' not in c or c['Port'] not in self.devices:
             raise HSSError(2)
         active_device=self.devices[c['Port']]
-        write_out,rest=active_device.input_buffer[:count],active_device.output_buffer[count:]
+        write_out,rest=active_device.input_buffer[:count],active_device.input_buffer[count:]
         active_device.input_buffer=rest
         return write_out.decode()
 
@@ -96,7 +95,7 @@ class CSHardwareSimulatingServer(LabradServer):
             
             
                 
-        active_device.input_buffer=bytearray(rest.encode())
+        active_device.output_buffer=bytearray(rest.encode())
     
 
     
@@ -158,7 +157,7 @@ class CSHardwareSimulatingServer(LabradServer):
             raise HSSError(1)
         c['Port']=port
 
-    @setting(71, 'Set Communication Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
+    @setting(71, 'Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
     def baudrate(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
             raise HSSError(2)
@@ -170,7 +169,7 @@ class CSHardwareSimulatingServer(LabradServer):
                 active_device.actual_baudrate=val
         return active_device.actual_baudrate
         
-    @setting(72, 'Set Communication Bytesize',data=[': Query current stopbits', 'w: Set bytesize'], returns='w: Selected bytesize')
+    @setting(72, 'Bytesize',val=[': Query current stopbits', 'w: Set bytesize'], returns='w: Selected bytesize')
     def bytesize(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
             raise HSSError(2)
@@ -182,7 +181,7 @@ class CSHardwareSimulatingServer(LabradServer):
                 active_device.actual_bytesize=val
         return active_device.actual_bytesize
         
-    @setting(73, 'Set Communication Parity', data=[': Query current parity', 'w: Set parity'], returns='w: Selected parity')
+    @setting(73, 'Parity', val=[': Query current parity', 'w: Set parity'], returns='w: Selected parity')
     def parity(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
             raise HSSError(2)
@@ -194,7 +193,7 @@ class CSHardwareSimulatingServer(LabradServer):
                 active_device.actual_parity=val
         return active_device.actual_parity
         
-    @setting(74, 'Set Communication Stopbits', data=[': Query current stopbits', 'w: Set stopbits'], returns='w: Selected stopbits')
+    @setting(74, 'Stopbits', val=[': Query current stopbits', 'w: Set stopbits'], returns='w: Selected stopbits')
     def stopbits(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
             raise HSSError(2)
@@ -206,7 +205,7 @@ class CSHardwareSimulatingServer(LabradServer):
                 active_device.actual_stopbits=val
         return active_device.actual_stopbits
         
-    @setting(75, 'Set Communication RTS', val='b', returns='b')
+    @setting(75, 'RTS', val='b', returns='b')
     def rts(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
             raise HSSError(2)
@@ -218,7 +217,7 @@ class CSHardwareSimulatingServer(LabradServer):
             active_device.actual_rts=val
         return active_device.actual_rts
         
-    @setting(76, 'Set Communication DTR', val='b', returns='b')
+    @setting(76, 'DTR', val='b', returns='b')
     def dtr(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
             raise HSSError(2)
@@ -231,9 +230,13 @@ class CSHardwareSimulatingServer(LabradServer):
         return active_device.actual_dtr
         
         
-    @setting(81, 'Set Buffer Size', returns='')
+    @setting(81, 'Buffer Size', returns='')
     def buffer_size(self,c):
         return 0
+        
+    @setting(91, 'Get Devices List',returns='*s')
+    def get_devices_list(self,c):
+        return list(self.devices.keys())
 
   
 
