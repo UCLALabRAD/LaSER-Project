@@ -242,13 +242,13 @@ class CSSerialDeviceServer(LabradServer):
                 serStr = yield self.findSerial(self.serNode)
                 yield self.initSerial(serStr, self.port, baudrate=self.baudrate, timeout=self.timeout,
                                       bytesize=self.bytesize, parity=self.parity,stopbits=self.stopbits)
-            except SerialConnectionError as e:
+            except SerialConnectionError as e: #huh?
                 self.ser = None
                 if e.code == 0:
                     print('Could not find serial server for node: %s' % self.serNode)
                     print('Please start correct serial server')
-                elif e.code == 1:
-                    print('Error opening serial connection')
+                elif e.code == 1 or e.code == 2:
+                    print('Serial Connection Error.')
                 else:
                     raise Exception('Unknown connection error')
             except Error:
@@ -322,9 +322,9 @@ class CSSerialDeviceServer(LabradServer):
             yield self.ser.flush_input()
             yield self.ser.flush_output()
             print('Serial connection opened.')
-        except Error:
+        except Error as e:
             self.ser = None
-            raise SerialConnectionError(1)
+            raise Error(code=1, msg=e.message)
 
     @inlineCallbacks
     def findSerial(self, serNode=None):

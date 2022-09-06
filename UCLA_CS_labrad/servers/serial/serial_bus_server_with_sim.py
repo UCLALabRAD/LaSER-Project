@@ -61,15 +61,17 @@ class CSSerialServerSim(CSPollingServer):
             
             self.ctxt= ctxt
             
-            self.ser.select_device(port,context=self.ctxt)
+            self.select_port= lambda port: self.ser.select_device(port,context=self.ctxt)
+            
             
             
             self.reset_input_buffer= lambda: self.ser.reset_input_buffer(context=self.ctxt)
-                
             self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
+            
             
             self.set_buffer_size= lambda size: None
 
+            self.echo= lambda: self.ser
             
             self.open = lambda: None
             self.close = lambda: None
@@ -227,9 +229,11 @@ class CSSerialServerSim(CSPollingServer):
             
     def getPort(self,c):
         try:
+            port_obj=c['PortObject']
+            #would be nice to do a dummy write or read here so we can handle an error right here if device was "unplugged"
             return c['PortObject']
         except Exception as e:
-            raise NoPortSelectedError()
+            raise Error(code=3,msg=e.message)
             
 #Get Information About Ports
     @setting(10, 'List Serial Ports', returns='*s: List of serial ports')
@@ -273,11 +277,16 @@ class CSSerialServerSim(CSPollingServer):
                     try:
                         c['PortObject'] = self.create_serial_connection(x)
                         return x.name
+
                     except SerialException as e:
                         if e.message.find('cannot find') >= 0:
                             raise Error(code=1, msg=e.message)
                         else:
-                            raise Error(code=2, msg=e.message)
+                            raise Error(code=3, msg=e.message)
+                            
+                    except SimSerialDeviceError as e:
+                        raise Error(code=2, msg=e.message) #should this be combined with error code 3?
+
         raise Error(code=1, msg='Unknown port %s' % (port,))
 
     

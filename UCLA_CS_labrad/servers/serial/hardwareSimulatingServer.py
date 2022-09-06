@@ -8,7 +8,7 @@ from labrad.server import LabradServer, Signal, setting
 __all__ = ['SerialDevice','CSHardwareSimulatingServer','SimulatedDeviceError']
 
 class HSSError(Exception):
-    errorDict ={0: 'Port in Use',1: 'Device Does Not Exist',2: 'No device selected'}
+    errorDict ={0: 'Port in Use',1: 'No device at port'}
 
     def __init__(self, code):
         self.code = code
@@ -18,17 +18,15 @@ class HSSError(Exception):
             return self.errorDict[self.code]
             
 class SimulatedDeviceError(Exception):
-
+    errorDict ={0: 'Unsupported Value for Serial Connection Parameter'}
 
     def __init__(self, code):
         self.code = code
-        self.errorDict ={0: 'Wrong number of arguments',1: 'Value for serial communication parameter not supported',2: 'Command not recognized.'}
-
 
     def __str__(self):
         if self.code in self.errorDict:
             return self.errorDict[self.code]
-
+            
 
 class SerialDevice(object):
 
@@ -68,7 +66,7 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(11, 'Read', count='i', returns='s')
     def read(self,c,count):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         write_out,rest=active_device.input_buffer[:count],active_device.input_buffer[count:]
         active_device.input_buffer=rest
@@ -78,7 +76,7 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(12, 'Write', data='s', returns='')
     def write(self,c,data):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         active_device.output_buffer.extend(data.encode())
         *cmds, rest=active_device.output_buffer.decode().split("\r\n")
@@ -115,7 +113,6 @@ class CSHardwareSimulatingServer(LabradServer):
     def remove_device(self,c, port):
         if port in self.devices:
             del self.devices[port]
-            
         else:
             raise HSSError(1)
         self.device_removed(port)
@@ -123,14 +120,14 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(41, 'Get In-Waiting', returns='i')
     def get_in_waiting(self,c):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         return len(active_device.input_buffer)
     
     @setting(42, 'Get Out-Waiting', returns='i')
     def get_out_waiting(self,c):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         return len(active_device.output_buffer)
     
@@ -138,14 +135,14 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(51, 'Reset Input Buffer', returns='')
     def reset_input_buffer(self,c):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         active_device.input_buffer=bytearray(b'')
     
     @setting(52, 'Reset Output Buffer', returns='')
     def reset_output_buffer(self,c):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         active_device.output_buffer=bytearray(b'')
 
@@ -160,11 +157,11 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(71, 'Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
     def baudrate(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         if val:
             if val!=active_device.required_baudrate:
-                raise SimulatedDeviceError(1)
+                raise SimulatedDeviceError(0)
             else:
                 active_device.actual_baudrate=val
         return active_device.actual_baudrate
@@ -172,11 +169,11 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(72, 'Bytesize',val=[': Query current stopbits', 'w: Set bytesize'], returns='w: Selected bytesize')
     def bytesize(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         if val:
             if val!=active_device.required_bytesize:
-                raise SimulatedDeviceError(1)
+                raise SimulatedDeviceError(0)
             else:
                 active_device.actual_bytesize=val
         return active_device.actual_bytesize
@@ -184,11 +181,11 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(73, 'Parity', val=[': Query current parity', 'w: Set parity'], returns='w: Selected parity')
     def parity(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         if val:
             if val!=active_device.required_parity:
-                raise SimulatedDeviceError(1)
+                raise SimulatedDeviceError(0)
             else:
                 active_device.actual_parity=val
         return active_device.actual_parity
@@ -196,11 +193,11 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(74, 'Stopbits', val=[': Query current stopbits', 'w: Set stopbits'], returns='w: Selected stopbits')
     def stopbits(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
         if val:
             if val!=active_device.required_stopbits:
-                raise SimulatedDeviceError(1)
+                raise SimulatedDeviceError(0)
             else:
                 active_device.actual_stopbits=val
         return active_device.actual_stopbits
@@ -208,11 +205,11 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(75, 'RTS', val='b', returns='b')
     def rts(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
  
         if val!=active_device.required_rts:
-            raise SimulatedDeviceError(1)
+            raise SimulatedDeviceError(0)
         else:
             active_device.actual_rts=val
         return active_device.actual_rts
@@ -220,11 +217,11 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(76, 'DTR', val='b', returns='b')
     def dtr(self,c,val):
         if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(2)
+            raise HSSError(1)
         active_device=self.devices[c['Port']]
  
         if val!=active_device.required_dtr:
-            raise SimulatedDeviceError(1)
+            raise SimulatedDeviceError(0)
         else:
             active_device.actual_dtr=val
         return active_device.actual_dtr
