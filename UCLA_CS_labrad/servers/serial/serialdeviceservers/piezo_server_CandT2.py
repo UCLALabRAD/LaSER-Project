@@ -1,10 +1,10 @@
 """
 ### BEGIN NODE INFO
 [info]
-name = CS Piezo Server
+name = CS Piezo Server 2
 version = 1.0.0
 description = Communicates with the AMO3 box for control of piezo voltages.
-instancename = CSPiezoServer
+instancename = CSPiezoServer2
 
 [startup]
 cmdline = %PYTHON% %FILE%
@@ -26,13 +26,13 @@ from UCLA_CS_labrad.servers.serial.csserialdeviceserver import *
 TERMINATOR = '\r\n'
 
 
-class CSPiezoServer(CSSerialDeviceServer):
+class CSPiezoServer2(CSSerialDeviceServer):
     """
     Communicates with the AMO3 box for control of piezo voltages.
     """
 
-    name = 'CS Piezo Server'
-    regKey = 'CSPiezoServer'
+    name = 'CS Piezo Server 2'
+    regKey = 'CSPiezoServer2'
     serNode = 'landons-macbook-pro.local'
     port = None
     timeout = WithUnit(3.0, 's')
@@ -135,4 +135,4 @@ class CSPiezoServer(CSSerialDeviceServer):
 
 if __name__ == '__main__':
     from labrad import util
-    util.runServer(CSPiezoServer())
+    util.runServer(CSPiezoServer2())

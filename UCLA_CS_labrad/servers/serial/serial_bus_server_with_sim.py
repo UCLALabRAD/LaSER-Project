@@ -74,6 +74,7 @@ class CSSerialServerSim(CSPollingServer):
             self.open = lambda: None
             self.close = lambda: None
             
+            self.port=port
 
             self.timeout=1
             
@@ -104,7 +105,7 @@ class CSSerialServerSim(CSPollingServer):
         @property
         @inlineCallbacks
         def baudrate(self):
-            resp=yield self.ser.baudrate(None,context=self.ctxt, )
+            resp=yield self.ser.baudrate(None,context=self.ctxt)
             returnValue(resp)
              
         @baudrate.setter
@@ -205,8 +206,15 @@ class CSSerialServerSim(CSPollingServer):
         """
 
         dev_list = list_ports.comports()
+        not_in_use_dev_list=[]
+        in_use_port_list=[context_obj.data['PortObject'].port  for context_obj in self.contexts.values() if (('PortObject' in context_obj.data) and context_obj.data['PortObject'])]
+        #print(in_use_port_list)
+        for dev in dev_list:
+            #print(dev[0])
+            if dev[0] not in in_use_port_list:
+                not_in_use_dev_list.append(dev)
         connected_phys_devices=[]
-        for d in dev_list:
+        for d in not_in_use_dev_list:
             dev_path = d[0]
             try:
                 ser = Serial(dev_path)
@@ -217,7 +225,7 @@ class CSSerialServerSim(CSPollingServer):
                 _, _, dev_name = dev_path.rpartition(os.sep)
                 connected_phys_devices.append(SerialDevice(dev_name,dev_path,None))
         # send out signal
-        self.SerialPorts=connected_phys_devices+self.sim_devices
+        self.SerialPorts=connected_phys_devices+[dev for dev in self.sim_devices if dev.name not in in_use_port_list]
         port_list_tmp = [x.name for x in self.SerialPorts]
         self.port_update(self.name, port_list_tmp)
 
@@ -299,7 +307,7 @@ class CSSerialServerSim(CSPollingServer):
         if serial_device.HSS:
             return self.DeviceConnection(serial_device.HSS,serial_device.name,self.client.context())
         else:
-            return Serial(serial_device.name)
+            return Serial(serial_device.devicepath, timeout=0)
                 
 
 
