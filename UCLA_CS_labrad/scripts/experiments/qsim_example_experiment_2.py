@@ -40,7 +40,7 @@ class experiment_example(QsimExperiment):
         '''
 
         self.ident = ident  # this is required so that script scanner can sort and access different instances
-        self.pzt_server = cxn.cs_piezo_server
+        self.pzt_server = cxn.cs_piezo_server_3
         self.pzt_channel = 1
 
     def run(self, cxn, context):
