@@ -40,7 +40,7 @@ class experiment_example(QsimExperiment):
         '''
 
         self.ident = ident  # this is required so that script scanner can sort and access different instances
-        self.pzt_server = cxn.cs_piezo_server_3
+        self.pzt_server = cxn.cs_piezo_server
         self.pzt_channel = 1
 
     def run(self, cxn, context):
@@ -71,7 +71,7 @@ class experiment_example(QsimExperiment):
 
             y_point = self.amplitude * 0.5*x_point  # calculates the parabola
             self.pzt_server.voltage(self.pzt_channel, self.pzt_voltage + y_point)
-
+			
             assert self.pzt_server.voltage(self.pzt_channel) != self.pzt_voltage
 
             self.dv.add(x_point, y_point)  # adds the data to Data Vault which will be automatically plotted

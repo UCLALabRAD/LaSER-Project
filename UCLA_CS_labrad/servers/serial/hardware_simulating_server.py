@@ -43,14 +43,23 @@ class SerialDevice(object):
     actual_stopbits=None
     actual_dtr=None
     actual_rst=None
-        
-    def interpretSerialCommand(self,cmd):
-        pass
+       
         
         
     def __init__(self):
         self.output_buffer=bytearray(b'')
         self.input_buffer=bytearray(b'')
+	
+	def interpret_serial_command(self,cmd):
+		cmd,*args= cmd.split(' ')
+		if 'Port' not in c or c['Port'] not in self.devices:
+            raise HSSError(1)
+			
+        active_device=self.devices[c['Port']]
+		if (cmd,len(args)) not in active_device.command_dict:
+			SDSError()
+		else:
+			active_device.command_dict[(cmd,len(args)](args)
         
     
 # DEVICE CLASS
@@ -58,6 +67,7 @@ class CSHardwareSimulatingServer(LabradServer):
     
     device_added=Signal(565656,'Signal: Simulated Device Added','(s,s)')
     device_removed=Signal(676767,'Signal: Simulated Device Removed','s')
+	
     def initServer(self):
         super().initServer()
         self.devices={}
@@ -95,17 +105,15 @@ class CSHardwareSimulatingServer(LabradServer):
                 
         active_device.output_buffer=bytearray(rest.encode())
     
+	
 
-    
-    def createNewDevice(self):
-        pass
-    
+
     
     @setting(31, 'Add Simulated Device', port='s', returns='')
     def add_device(self, c, port):
         if port in self.devices:
             raise HSSError(0)
-        self.devices[port]=self.create_new_device() #better way to do this?
+        self.devices[port]= 
         self.device_added((self.name,port))
         
         
@@ -148,11 +156,20 @@ class CSHardwareSimulatingServer(LabradServer):
 
     @setting(61, 'Select Device', port='s', returns='')
     def select_device(self,c,port):
-        if 'Port' in c:
-            del c['Port']
-        if port not in self.devices:
-            raise HSSError(1)
+		if 'Port' in c and c['Port']:
+			HSSError()
         c['Port']=port
+		notified = self.listeners.copy()
+		notified.remove(c.ID)
+		self.device_removed((self.name,port),notified)  #NOTIFYOTHERS
+		
+	@setting(62, 'Deselect Device', returns='')
+    def deselect_device(self,c):
+		if 'Port' in c and c['Port']:
+			self.device_added((self.name,port))
+			del c['Port']
+		else:
+			HSSError()
 
     @setting(71, 'Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
     def baudrate(self,c,val):
@@ -234,6 +251,12 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(91, 'Get Devices List',returns='*s')
     def get_devices_list(self,c):
         return list(self.devices.keys())
+	
+	
+			
+		
+			
+		
 
   
 

@@ -53,32 +53,27 @@ class CSSerialServer(CSPollingServer):
         Wrapper for our server's client connection to the serial server.
         @raise labrad.types.Error: Error in opening serial connection
         """
-        def __init__(self, hardware_simulating_server, port,ctxt):
+        def __init__(self, hss, port):
         
-            self.ser=hardware_simulating_server
         
-            self.name=hardware_simulating_server.name+" Simulated Device " + port
+            self.name=hss.name+" Simulated Device " + port
             
-            self.ctxt= ctxt
+            self.timeout=1
+			
+			self.open(port)
             
-            self.select_port= lambda port: self.ser.select_device(port,context=self.ctxt)
+            self.open= lambda port: hss.select_device(port)
+			
+			self.close = lambda: hss.deselect_device()
             
-            
-            
-            self.reset_input_buffer= lambda: self.ser.reset_input_buffer(context=self.ctxt)
-            self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
+            self.reset_input_buffer= lambda: hss.reset_input_buffer
+            self.reset_output_buffer= lambda: hss.reset_output_buffer
             
             
             self.set_buffer_size= lambda size: None
-
-            self.echo= lambda: self.ser
             
-            self.open = lambda: None
-            self.close = lambda: None
-            
-            self.port=port
+			
 
-            self.timeout=1
             
             
             
@@ -233,7 +228,7 @@ class CSSerialServer(CSPollingServer):
 
     def expireContext(self, c):
         if 'PortObject' in c:
-            c['PortObject'].close()
+            yield c['PortObject'].close()
             
     def getPort(self,c):
         try:
@@ -277,14 +272,14 @@ class CSSerialServer(CSPollingServer):
         """
         
         if 'PortObject' in c:
-            c['PortObject'].close()
+            yield c['PortObject'].close()
             del c['PortObject']
             
         for x in self.SerialPorts:
             if os.path.normcase(x.name) == os.path.normcase(port) or x.name==port:
                     try:
-                        c['PortObject'] = self.create_serial_connection(x)
-                        return x.name
+                        c['PortObject'] = yield self.create_serial_connection(x)
+                        returnValue(x.name)
 
                     except SerialException as e:
                         if e.message.find('cannot find') >= 0:
@@ -305,7 +300,7 @@ class CSSerialServer(CSPollingServer):
         Closes the current serial port.
         """
         if 'PortObject' in c:
-            c['PortObject'].close()
+            yield c['PortObject'].close()
             del c['PortObject']
 
     
@@ -314,7 +309,7 @@ class CSSerialServer(CSPollingServer):
 
     def create_serial_connection(self,serial_device):
         if serial_device.HSS:
-            return self.DeviceConnection(serial_device.HSS,serial_device.name,self.client.context())
+            return self.DeviceConnection(serial_device.HSS(),serial_device.name)
         else:
             return Serial(serial_device.devicepath, timeout=0)
                 
@@ -502,8 +497,8 @@ class CSSerialServer(CSPollingServer):
             if r == b'':
                 r = yield self.deferredRead(ser, timeout, count - len(recd))
                 if r == b'':
-                    ser.close()
-                    ser.open()
+                    yield ser.close()
+                    yield ser.open()
                     break
             recd += r
         returnValue(recd)
