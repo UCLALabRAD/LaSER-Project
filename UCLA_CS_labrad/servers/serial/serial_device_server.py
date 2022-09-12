@@ -164,9 +164,9 @@ class CSSerialDeviceServer(LabradServer):
 
     # node parameters
     name = 'CSSerialDevice'
-	reg_key = None
+    reg_key = None
     default_port = None
-	default_node = None
+    default_node = None
     
     
 
@@ -177,9 +177,9 @@ class CSSerialDeviceServer(LabradServer):
     parity = None
     stopbits = None
 
-	serial_connection_dict=[]
+    serial_connection_dict={}
     
-	
+    
 
     class SerialConnection(object):
         """
@@ -228,32 +228,23 @@ class CSSerialDeviceServer(LabradServer):
         # call parent initServer to support further subclassing
         super().initServer()
         # get default node and port from registry (this overrides hard-coded values)
-		if self.default_node and self.default_port:
-			c['Serial Node'] = self.default_node
-            c['Serial Port'] = self.default_port
         if self.regKey is not None:
             print('RegKey specified. Looking in registry for default node and port.')
             try:
                 node, port = yield self.getPortFromReg(self.regKey)
-                c['Serial Node'] = node
-                c['Serial Port'] = port
+                self.default_node = node
+                self.default_port = port
             except Exception as e:
                 print('Unable to find default node and port in registry. Using hard-coded values if they exist.')
          #open connection on startup if default node and port are specified
 
-        if c['Serial Node'] and c['Serial Port']:
-			if (c['Serial Node'],c['Serial Port']) in self.serial_connection_dict:
-				c['SerialConnection']=self.serial_connection_dict[(c['Serial Node'],c['Serial Port'])]
-				return
+        if self.default_node and self.default_port:
             print('Default node and port specified. Connecting to device on startup.')
             try:
-                serStr = yield self.findSerial(c['Serial Node'])
-                yield self.initSerial(serStr, c['Serial Port'], baudrate=self.baudrate, timeout=self.timeout,
+                serStr = yield self.findSerial(self.default_node)
+                yield self.initSerial(serStr, self.default_port, baudrate=self.baudrate, timeout=self.timeout,
                                       bytesize=self.bytesize, parity=self.parity,stopbits=self.stopbits)
-            except SerialConnectionError as e: #huh?
-                c['Serial Connection'] = None
-				c['Serial Port'] = None
-				c['Serial Node'] = None
+            except SerialConnectionError as e:
                 if e.code == 0:
                     print('Could not find serial server for node: %s' % c['Serial Node'])
                     print('Please start correct serial server')
@@ -272,11 +263,14 @@ class CSSerialDeviceServer(LabradServer):
         Close serial connection before exiting.
         """
         super().stopServer()
-        if c['Serial Connection']:
-            yield c['Serial Connection'].acquire()
-            c['Serial Connection'].close()
-            c['Serial Connection'].release()
-
+        for conn in self.serial_connection_dict.values():
+            yield conn.acquire()
+            conn.close()
+            conn.release()
+            
+    #def initContext(self,c):
+    #    pass
+        
     @inlineCallbacks
     def getPortFromReg(self, regDir=None):
         """
@@ -327,19 +321,16 @@ class CSSerialDeviceServer(LabradServer):
             # get server wrapper for serial server
             ser = cli.servers[serStr]
             # instantiate SerialConnection convenience class
-			c['Serial Connection']=serial_connection_dict[(serStr,port)]=self.SerialConnection(ser=ser(), port=port, **kwargs)
-			c['Serial Node']=serStr
-			c['Serial Port']=port
-			
-			
+            serial_connection_dict[(serStr,port)]=self.SerialConnection(ser=ser(), port=port, **kwargs)
+            
+            
             # clear input and output buffers
-            yield c['Serial Connection'].flush_input()
-            yield c['Serial Connection'].flush_output()
+            serial_connection_dict[(serStr,port)].flush_input()
+            serial_connection_dict[(serStr,port)].flush_output()
             print('Serial connection opened.')
         except Error as e:
-            c['Serial Connection'] = None
-			c['Serial Port'] = None
-			c['Serial Node'] = None
+            if (serStr,port) in serial_connection_dict:
+                del serial_connection_dict[(serStr,port)]
             raise Error(code=1, msg=e.message)
 
     @inlineCallbacks
@@ -352,7 +343,7 @@ class CSSerialDeviceServer(LabradServer):
         @raise SerialConnectionError: Error code 0.  Could not find desired serial server.
         """
         if not serNode:
-            serNode = c[']
+            serNode = self.default_node
         cli = self.client
         # look for servers with 'serial' and serNode in the name, take first result
         servers = yield cli.manager.servers()
@@ -376,29 +367,27 @@ class CSSerialDeviceServer(LabradServer):
 
 
     # SIGNALS
-    @inlineCallbacks
+ 
     def serverConnected(self, ID, name):
         """
         Attempt to connect to last connected serial bus server upon server connection.
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-        if (c['Serial Connection'] is None) and (None not in (self.default_node, self.default_port) and (self._matchSerial(self.default_node, name)):
-            print(name, 'connected after we connected.')
-            yield self.deviceSelect(None)
+        pass
 
     def serverDisconnected(self, ID, name):
         """
         Close serial device connection (if we are connected).
         """
-		for bus_server in [ser for (ser,port) in self.serial_connection_dict]:
-			if bus_server.ID == ID:
-				print('Serial bus server '+name+' disconnected. Relaunch the serial server')
-				for context_obj in self.contexts.values():
-					if 'Serial Connection' in context_obj.data:
-						context_obj.data['Serial Connection']=None
-						context_obj.data['Serial Port'] = None
-						context_obj.data['Serial Node'] = None
+        for bus_server in [ser for (ser,port) in self.serial_connection_dict]:
+            if bus_server.ID == ID:
+                print('Serial bus server '+name+' disconnected. Relaunch the serial server')
+                for context_obj in self.contexts.values():
+                    if 'Serial Connection' in context_obj.data:
+                        context_obj.data['Serial Connection']=None
+                        context_obj.data['Serial Port'] = None
+                        context_obj.data['Serial Node'] = None
 
 
     # SETTINGS
@@ -420,27 +409,27 @@ class CSSerialDeviceServer(LabradServer):
             Exception('A serial device is already opened.')
         # set parameters if specified
         elif (node is not None) and (port is not None):
-            c['Serial Node'] = node
-            c['Serial Port'] = port
+            desired_node = node
+            desired_port = port
         # connect to default values if no arguments at all
         elif ((node is None) and (port is None)) and (self.default_node and self.default_port):
-            c['Serial Node'] = self.default_node
-			c['Serial Node'] = self.default_port
+            desired_node = self.default_node
+            desired_port = self.default_port
         # raise error if only node or port is specified
         else:
             raise Exception('Insufficient arguments.')
-		if (c['Serial Node'],c['Serial Port']) in self.serial_connection_dict:
-				c['SerialConnection']=self.serial_connection_dict[(c['Serial Node'],c['Serial Port'])]
-				return
-        # try to find the serial server and connect to the designated port
         try:
-            serStr = yield self.findSerial(c['Serial Node'])
-            yield self.initSerial(serStr, c['Serial Port'], baudrate=self.baudrate, timeout=self.timeout,
-                                  bytesize=self.bytesize, parity=self.parity)
+            desired_node=yield self.findSerial(desired_node)
+            if (desired_node,desired_port) not in self.serial_connection_dict:
+                self.initSerial(desired_node, desired_port, baudrate=self.baudrate, timeout=self.timeout, bytesize=self.bytesize, parity=self.parity)
+            c['Serial Connection']=self.serial_connection_dict[(desired_node,desired_port)]
+            c['Serial Node']=desired_node
+            c['Serial Port']=desired_port
+
         except SerialConnectionError as e:
             c['Serial Connection'] = None
-			c['Serial Port'] = None
-			c['Serial Node'] = None
+            c['Serial Port'] = None
+            c['Serial Node'] = None
             if e.code == 0:
                 print('Could not find serial server for node: %s' % c['Serial Node'])
                 print('Please start correct serial server')
@@ -451,8 +440,8 @@ class CSSerialDeviceServer(LabradServer):
             raise e
         except Exception as e:
             c['Serial Connection'] = None
-			c['Serial Port'] = None
-			c['Serial Node'] = None
+            c['Serial Port'] = None
+            c['Serial Node'] = None
             print(e)
         else:
             return (c['Serial Node'], c['Serial Port'])
@@ -464,10 +453,10 @@ class CSSerialDeviceServer(LabradServer):
         """
         if c['Serial Connection']:
             c['Serial Connection'].close()
-			del self.serial_connection_dict[(c['Serial Node'],c['Serial Port'])]
+            del self.serial_connection_dict[(c['Serial Node'],c['Serial Port'])]
             c['Serial Connection'] = None
-			c['Serial Port'] = None
-			c['Serial Node'] = None
+            c['Serial Port'] = None
+            c['Serial Node'] = None
             print('Serial connection closed.')
         else:
             raise Exception('No device selected.')

@@ -1,10 +1,28 @@
+"""
+### BEGIN NODE INFO
+[info]
+name = CS Hardware Simulating Server
+version = 1.1
+description = Gives access to serial devices via pyserial.
+instancename = CS Hardware Simulating Server
 
+[startup]
+cmdline = %PYTHON% %FILE%
+timeout = 20
+
+[shutdown]
+message = 987654321
+timeout = 20
+### END NODE INFO
+"""
 from twisted.internet.defer import returnValue, inlineCallbacks, DeferredLock
 
 from labrad.errors import Error
 from labrad.server import LabradServer, Signal, setting
 
-
+from UCLA_CS_labrad.servers.serial import sim_device_config_parser
+import os
+import importlib
 __all__ = ['SerialDevice','CSHardwareSimulatingServer','SimulatedDeviceError']
 
 class HSSError(Exception):
@@ -45,34 +63,113 @@ class SerialDevice(object):
     actual_rst=None
        
         
-        
     def __init__(self):
         self.output_buffer=bytearray(b'')
         self.input_buffer=bytearray(b'')
-	
-	def interpret_serial_command(self,cmd):
-		cmd,*args= cmd.split(' ')
-		if 'Port' not in c or c['Port'] not in self.devices:
+   
+    def interpret_serial_command(self,cmd):
+        cmd,*args= cmd.split(' ')
+        if 'Port' not in c or c['Port'] not in self.devices:
             raise HSSError(1)
-			
+         
         active_device=self.devices[c['Port']]
-		if (cmd,len(args)) not in active_device.command_dict:
-			SDSError()
-		else:
-			active_device.command_dict[(cmd,len(args)](args)
+        if (cmd,len(args)) not in active_device.command_dict:
+            SDSError()
+        else:
+            active_device.command_dict[(cmd,len(args))](args)
         
     
 # DEVICE CLASS
 class CSHardwareSimulatingServer(LabradServer):
-    
+    name='CS Hardware Simulating Server'
     device_added=Signal(565656,'Signal: Simulated Device Added','(s,s)')
     device_removed=Signal(676767,'Signal: Simulated Device Removed','s')
-	
+   
+    registryDirectory = ['', 'Servers', 'CS Hardware Simulating Server','Simulated Devices']
+   
     def initServer(self):
         super().initServer()
         self.devices={}
-        
-  
+        self.HSS_config_dirs=yield self._getSimDeviceDirectories(self.registryDirectory)
+        self.refreshDeviceTypes()
+		
+		
+    def refreshDeviceTypes(self):
+        """Refresh the list of available servers."""
+        # configs is a nested map from name to version to list of classes.
+        #
+        # This allows us to deal with cases where there are many definitions
+        # for different server versions, and possibly also redundant defitions
+        # for the same version.
+        configs = {}
+        print('WELLHOWDY')
+        # look for .ini files
+        for dirname in self.HSS_config_dirs:
+            for path, dirs, files in os.walk(dirname):
+                if '.simdeviceignore' in files:
+                    del dirs[:] # clear dirs list so we don't visit subdirs
+                    continue
+                for f in files:
+                    try:
+                        _, ext = os.path.splitext(f)
+                        if ext.lower() != ".py":
+                            continue
+                        else:
+                            conf = sim_device_config_parser.find_config_block(path, f)
+                            if conf is None:
+                                continue
+                        config = sim_device_config_parser.from_string(conf, f, path)
+                        versions = configs.setdefault(config.name, {})
+                        versions.setdefault(config.version, []).append(config)
+                    except Exception:
+                        fname = os.path.join(path, f)
+                        logging.error('Error while loading config file "%s":' % fname,
+                                  exc_info=True)
+
+        device_configs = {}
+        for versions in configs.values():
+            for devices in versions.values():
+                if len(devices) > 1:
+                    conflicting_files = [d.filename for d in devices]
+                    d = devices[0]
+                    logging.warning(
+                        'Found redundant device configs with same name and '
+                        'version; will use {}. name={}, version={}, '
+                        'conflicting_files={}'
+                        .format(d.filename, d.name, d.version,
+                                conflicting_files))
+
+            devices = [ss[0] for ss in versions.values()]
+            devices.sort(key=lambda s: s.version_tuple)
+            if len(devices) > 1:
+                # modify server name for all but the latest version
+                for d in devices[:-1]:
+                    d.name = '{}-{}'.format(d.name, d.version)
+
+            for d in devices:
+                device_configs[d.name] = d
+        self.device_configs = device_configs
+        # Send a message with the current server list. We pre-flatten the server
+        # status information to the correct type to work around a problem with
+        # type inference while flattening (#342).
+        status_data = T.flatten(self.status(), STATUS_TYPE)
+        self._relayMessage('status', devices=status_data)
+
+    def _relayMessage(self, signal, **kw):
+        """Send messages out to LabRAD."""
+        kw['node'] = self.name
+        mgr = self.client.manager
+        mgr.send_named_message('simdevice.' + signal, tuple(kw.items()))
+   
+    def status(self):
+        """Get information about all servers on this node."""
+        def device_info(config):
+            return (config.name, config.description or '', config.version)
+
+        return [device_info(config) for _name, config in sorted(self.server_configs.items())]
+
+
+
     @setting(11, 'Read', count='i', returns='s')
     def read(self,c,count):
         if 'Port' not in c or c['Port'] not in self.devices:
@@ -105,16 +202,20 @@ class CSHardwareSimulatingServer(LabradServer):
                 
         active_device.output_buffer=bytearray(rest.encode())
     
-	
+   
 
 
     
     @setting(31, 'Add Simulated Device', port='s', returns='')
-    def add_device(self, c, port):
+    def add_device(self, c, port,name):
         if port in self.devices:
             raise HSSError(0)
-        self.devices[port]= 
-        self.device_added((self.name,port))
+        if name not in self.device_configs:
+            raise HSSError(0)
+		
+        SimDevice=importlib.import_module(name,self.device_configs[name].package)
+        self.devices[port]=SimDevice()
+        self.device_added((port))
         
         
     @setting(32, 'Remove Simulated Device', port='s', returns='')
@@ -123,7 +224,7 @@ class CSHardwareSimulatingServer(LabradServer):
             del self.devices[port]
         else:
             raise HSSError(1)
-        self.device_removed(port)
+        self.device_removed((port))
     
     @setting(41, 'Get In-Waiting', returns='i')
     def get_in_waiting(self,c):
@@ -156,20 +257,20 @@ class CSHardwareSimulatingServer(LabradServer):
 
     @setting(61, 'Select Device', port='s', returns='')
     def select_device(self,c,port):
-		if 'Port' in c and c['Port']:
-			HSSError()
+        if 'Port' in c and c['Port']:
+            HSSError()
         c['Port']=port
-		notified = self.listeners.copy()
-		notified.remove(c.ID)
-		self.device_removed((self.name,port),notified)  #NOTIFYOTHERS
-		
-	@setting(62, 'Deselect Device', returns='')
+        notified = self.listeners.copy()
+        notified.remove(c.ID)
+        self.device_removed((self.name,port),notified)  #NOTIFYOTHERS
+      
+    @setting(62, 'Deselect Device', returns='')
     def deselect_device(self,c):
-		if 'Port' in c and c['Port']:
-			self.device_added((self.name,port))
-			del c['Port']
-		else:
-			HSSError()
+        if 'Port' in c and c['Port']:
+            self.device_added((self.name,port))
+            del c['Port']
+        else:
+            HSSError()
 
     @setting(71, 'Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
     def baudrate(self,c,val):
@@ -251,12 +352,36 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(91, 'Get Devices List',returns='*s')
     def get_devices_list(self,c):
         return list(self.devices.keys())
-	
-	
-			
-		
-			
-		
+      
+    @setting(92, 'Get Device Types',returns='*s')
+    def available_device_types(self, c):
+        """Get information about all servers on this node."""
+        def device_info(config):
+            device_names = [dev.name for dev in config.values()]
+            return (config.name, config.description or '', config.version)
 
-  
+        return [device_info(config)
+                for _name, config in sorted(self.device_configs)]
+
+    @inlineCallbacks
+    def _getSimDeviceDirectories(self, path):
+        """
+        A recursive function that gets any parameters in the given directory.
+        Arguments:
+            topPath (list(str)): the top-level directory that Parameter vault has access to.
+                                    this isn't modified by any recursive calls.
+            subPath (list(str)): the subdirectory from which to get parameters.
+        """
+        # get everything in the given directory
+        yield self.client.registry.cd(path)
+        _, keys = yield self.client.registry.dir()
+        dirs= yield self.client.registry.get('Directories')
+        returnValue(dirs)
+       
+
+__server__ = CSHardwareSimulatingServer()
+
+if __name__ == '__main__':
+    from labrad import util
+    util.runServer(__server__)
 

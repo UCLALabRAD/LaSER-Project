@@ -1,9 +1,17 @@
+"""
+### BEGIN SIMULATED DEVICE INFO
+[info]
+name = SimulatedPiezoDevice
+version = 1.0
+description = Blah
+### END SIMULATED DEVICE INFO
+"""
+
 from UCLA_CS_labrad.servers.serial.hardware_simulating_server import SerialDevice
 from labrad.errors import Error
 
 
 class SimulatedPiezoDevice(SerialDevice):
-
 	command_dict={
 		("remote.r",1)           : None,
 		("remote.w",2)        : None
