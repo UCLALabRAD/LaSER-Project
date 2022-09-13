@@ -53,18 +53,20 @@ class CSSerialServer(CSPollingServer):
         Wrapper for our server's client connection to the serial server.
         @raise labrad.types.Error: Error in opening serial connection
         """
-        def __init__(self, hss, port):
+        def __init__(self, hss, node, port):
         
         
-            self.name=hss.name+" Simulated Device " + port
+            self.name="Simulated Device at Node " node ", Port "+ port
             
             self.timeout=1
 			
-			self.open(port)
-            
-            self.open= lambda port: hss.select_device(port)
+			self.open= lambda: hss.select_device(node, port)
 			
-			self.close = lambda: hss.deselect_device()
+			self.open()
+            
+
+			
+			self.close = lambda: hss.deselect_device(node)
             
             self.reset_input_buffer= lambda: hss.reset_input_buffer
             self.reset_output_buffer= lambda: hss.reset_output_buffer
@@ -176,9 +178,10 @@ class CSSerialServer(CSPollingServer):
         super().initServer()
         self.sim_devices=[]
         servers=yield self.client.manager.servers()
-        for HSS in [self.client.servers[HSS_name] for _,HSS_name in servers if 'simulating server' in HSS_name.lower()]:
-            existing_device_list=yield HSS.get_devices_list()
-            self.sim_devices+=[SerialDevice(port,None,HSS) for port in existing_device_list]
+		if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
+			HSS=self.client.servers['CS Hardware Simulating Server']
+            existing_device_list=yield HSS.get_devices_list(self.name)
+            self.sim_devices+=[SerialDevice(port,HSS) for port in existing_device_list]
             yield HSS.signal__simulated_device_added(8675309)
             yield HSS.signal__simulated_device_removed(8675310)
             yield HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
@@ -309,7 +312,7 @@ class CSSerialServer(CSPollingServer):
 
     def create_serial_connection(self,serial_device):
         if serial_device.HSS:
-            return self.DeviceConnection(serial_device.HSS(),serial_device.name)
+            return self.DeviceConnection(serial_device.HSS,serial_device.name)
         else:
             return Serial(serial_device.devicepath, timeout=0)
                 
@@ -619,8 +622,20 @@ class CSSerialServer(CSPollingServer):
         ser = self.getPort(c)
         val = ser.out_waiting
         return val
+
+    @setting(71, 'Add Simulated Device', port='s', returns='')
+    def add_simulated_device(self, c, port,device_type):
+        servers=yield self.client.manager.servers()
+		if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
+			HSS=self.client.servers['CS Hardware Simulating Server']
+            yield HSS.add_simulated_device(self.name,port,device_type)
         
-            
+    @setting(72, 'Remove Simulated Device', port='s', returns='')
+    def remove_simulated_device(self, c, port):
+        servers=yield self.client.manager.servers()
+		if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
+			HSS=self.client.servers['CS Hardware Simulating Server']
+            yield HSS.remove_simulated_device(self.name,port)    
 
 
     # SIGNALS
@@ -631,47 +646,38 @@ class CSSerialServer(CSPollingServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-        
-        cli=self.client
-        yield cli.refresh()
-        servers=yield self.client.manager.servers()
-        if "simulating server" in name.lower():
-            for _,server_name in servers:
-                if server_name==name:
-                    HSS=self.client.servers[server_name]
-                    yield HSS.signal__simulated_device_added(8675309)
-                    yield HSS.signal__simulated_device_removed(8675310)
-                    yield HSS.addListener(listener=self.simDeviceAdded, source=None, ID=8675309)
-                    yield HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
-                    break
+		if name=='CS Hardware Simulating Server':
+			yield self.client.refresh()
+			HSS=self.client.servers['CS Hardware Simulating Server']
+            yield HSS.signal__simulated_device_added(8675309)
+            yield HSS.signal__simulated_device_removed(8675310)
+            yield HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
+            yield HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
             
     # SIGNALS
     def serverDisconnected(self, ID, name):
-        if "simulating server" in name.lower():
-            self.sim_devices=[device for device in self.sim_devices if device.HSS.name != name]
+		if name=='CS Hardware Simulating Server':
+            self.sim_devices=[]
         
             
     
 
-    @inlineCallbacks
+
     def simDeviceAdded(self, c,data):
-        HSS_name, port=data
+        node, port=data
         cli=self.client
-        servers=yield cli.manager.servers()
-        correct_server=None
-        for _,server_name in servers:
-            if server_name==HSS_name:
-                correct_server=server_name
-                break
-        HSS=cli.servers[correct_server]
-        self.sim_devices.append(SerialDevice(port,None, HSS))
+        if node==self.name:
+            HSS=cli.servers['CS Hardware Simulating Server']
+            self.sim_devices.append(SerialDevice(port,None, HSS()))
    
    
-    def simDeviceRemoved(self, c, port_string):
-        for device in self.sim_devices:
-            if device.name==port_string:
-                self.sim_devices.remove(device)
-                break
+    def simDeviceRemoved(self, c, data):
+		node, port=data
+        if node==self.name:
+			for device in self.sim_devices:
+				if device.name==port:
+					self.sim_devices.remove(device)
+					break
    
    
    

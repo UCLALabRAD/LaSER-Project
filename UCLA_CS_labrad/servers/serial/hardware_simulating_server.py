@@ -92,8 +92,8 @@ class CSHardwareSimulatingServer(LabradServer):
         self.devices={}
         self.HSS_config_dirs=yield self._getSimDeviceDirectories(self.registryDirectory)
         self.refreshDeviceTypes()
-		
-		
+            
+            
     def refreshDeviceTypes(self):
         """Refresh the list of available servers."""
         # configs is a nested map from name to version to list of classes.
@@ -102,7 +102,6 @@ class CSHardwareSimulatingServer(LabradServer):
         # for different server versions, and possibly also redundant defitions
         # for the same version.
         configs = {}
-        print('WELLHOWDY')
         # look for .ini files
         for dirname in self.HSS_config_dirs:
             for path, dirs, files in os.walk(dirname):
@@ -172,9 +171,7 @@ class CSHardwareSimulatingServer(LabradServer):
 
     @setting(11, 'Read', count='i', returns='s')
     def read(self,c,count):
-        if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(1)
-        active_device=self.devices[c['Port']]
+        active_device=c['Device']
         write_out,rest=active_device.input_buffer[:count],active_device.input_buffer[count:]
         active_device.input_buffer=rest
         return write_out.decode()
@@ -182,9 +179,7 @@ class CSHardwareSimulatingServer(LabradServer):
     
     @setting(12, 'Write', data='s', returns='')
     def write(self,c,data):
-        if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(1)
-        active_device=self.devices[c['Port']]
+        active_device=c['Device']
         active_device.output_buffer.extend(data.encode())
         *cmds, rest=active_device.output_buffer.decode().split("\r\n")
         for cmd in cmds:
@@ -207,70 +202,74 @@ class CSHardwareSimulatingServer(LabradServer):
 
     
     @setting(31, 'Add Simulated Device', port='s', returns='')
-    def add_device(self, c, port,name):
+    def add_device(self, c, node, port,device_type):
         if port in self.devices:
             raise HSSError(0)
-        if name not in self.device_configs:
+        if device_type not in self.device_configs:
             raise HSSError(0)
-		
-        SimDevice=importlib.import_module(name,self.device_configs[name].package)
-        self.devices[port]=SimDevice()
+            
+        SimDevice=importlib.import_module(name,self.device_configs[device_type].package)
+        self.devices[(node,port)]=SimDevice()
         self.device_added((port))
         
         
     @setting(32, 'Remove Simulated Device', port='s', returns='')
-    def remove_device(self,c, port):
-        if port in self.devices:
-            del self.devices[port]
+    def remove_device(self,c, node, port):
+        if (node,port) in self.devices: 
+                  for context_obj in self.contexts.values():
+                    if 'Device' in context_obj.data and context_obj.data['Device'] is self.devices[(node,port)]:
+                        del context_obj.data['Device']
+                        break
+                  del self.devices[(node,port)]
         else:
             raise HSSError(1)
         self.device_removed((port))
     
     @setting(41, 'Get In-Waiting', returns='i')
     def get_in_waiting(self,c):
-        if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(1)
+        active_device=c['Device']
         active_device=self.devices[c['Port']]
         return len(active_device.input_buffer)
     
     @setting(42, 'Get Out-Waiting', returns='i')
     def get_out_waiting(self,c):
-        if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(1)
+        active_device=c['Device']
         active_device=self.devices[c['Port']]
         return len(active_device.output_buffer)
     
     
     @setting(51, 'Reset Input Buffer', returns='')
     def reset_input_buffer(self,c):
-        if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(1)
+        active_device=c['Device']
         active_device=self.devices[c['Port']]
         active_device.input_buffer=bytearray(b'')
     
     @setting(52, 'Reset Output Buffer', returns='')
     def reset_output_buffer(self,c):
-        if 'Port' not in c or c['Port'] not in self.devices:
-            raise HSSError(1)
-        active_device=self.devices[c['Port']]
+        active_device=c['Device']
         active_device.output_buffer=bytearray(b'')
 
     @setting(61, 'Select Device', port='s', returns='')
-    def select_device(self,c,port):
-        if 'Port' in c and c['Port']:
-            HSSError()
-        c['Port']=port
-        notified = self.listeners.copy()
-        notified.remove(c.ID)
-        self.device_removed((self.name,port),notified)  #NOTIFYOTHERS
+    def select_device(self,c,node,port):
+        if 'Device' in c:
+            pass
+            if (node,port) not in self.devices:
+                  pass
+            c['Device']=self.devices[(node,port)]
+        self.device_removed((node,port))
       
     @setting(62, 'Deselect Device', returns='')
     def deselect_device(self,c):
-        if 'Port' in c and c['Port']:
-            self.device_added((self.name,port))
-            del c['Port']
+        if 'Device' in c:
+                  for node,port in self.devices:
+                        if self.devices[(node,port)]==c['Device']:
+                            del self.devices[(node,port)]
+                            self.device_removed((node,port))
+                            break
+                        
+                  del c['Device']
         else:
-            HSSError()
+            pass
 
     @setting(71, 'Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
     def baudrate(self,c,val):
@@ -349,9 +348,9 @@ class CSHardwareSimulatingServer(LabradServer):
     def buffer_size(self,c):
         return 0
         
-    @setting(91, 'Get Devices List',returns='*s')
-    def get_devices_list(self,c):
-        return list(self.devices.keys())
+    @setting(91, 'Get Devices List',node_name='s', returns='*s')
+    def get_devices_list(self,c,node_name):
+        return list([port for (node,port) in self.devices if node==node_name])
       
     @setting(92, 'Get Device Types',returns='*s')
     def available_device_types(self, c):
