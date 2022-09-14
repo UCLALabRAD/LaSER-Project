@@ -46,35 +46,38 @@ class CSSerialServer(CSPollingServer):
     name = '%LABRADNODE% CS Serial Server'
     POLL_ON_STARTUP = True
     port_update = Signal(PORTSIGNAL, 'signal: port update', '(s,*s)')
-
+    HSS=None
 
     class DeviceConnection(object):
         """
         Wrapper for our server's client connection to the serial server.
         @raise labrad.types.Error: Error in opening serial connection
         """
-        def __init__(self, hss, node, port):
+        def __init__(self, hss, node, port,context):
+			
+            self.port=port
+			
+            self.ctxt=context
         
-        
-            self.name="Simulated Device at Node " node ", Port "+ port
+            self.name="Simulated Device at Node "+ node +", Port "+ port
             
             self.timeout=1
-			
-			self.open= lambda: hss.select_device(node, port)
-			
-			self.open()
             
-
-			
-			self.close = lambda: hss.deselect_device(node)
+            self.open= lambda: hss.select_device(node, port,context=self.ctxt)
             
-            self.reset_input_buffer= lambda: hss.reset_input_buffer
-            self.reset_output_buffer= lambda: hss.reset_output_buffer
+            self.open()
+            
+            self.ser=hss
+            
+            self.close = lambda: hss.deselect_device(context=self.ctxt)
+            
+            self.reset_input_buffer= lambda: hss.reset_input_buffer(context=self.ctxt)
+            self.reset_output_buffer= lambda: hss.reset_output_buffer(context=self.ctxt)
             
             
             self.set_buffer_size= lambda size: None
             
-			
+            
 
             
             
@@ -93,12 +96,12 @@ class CSSerialServer(CSPollingServer):
             
         @inlineCallbacks
         def read(self,bytes):
-            resp= yield self.ser.read(bytes, context=self.ctxt)
+            resp= yield self.ser.read(bytes,context=self.ctxt)
             returnValue(resp.encode())
                 
         @inlineCallbacks
         def write(self,data):
-            yield self.ser.write(data, context=self.ctxt)
+            yield self.ser.write(data,context=self.ctxt)
 
 
         @property
@@ -110,44 +113,44 @@ class CSSerialServer(CSPollingServer):
         @baudrate.setter
         @inlineCallbacks
         def baudrate(self, val):
-            yield self.ser.baudrate(val, context=self.ctxt)
+            yield self.ser.baudrate(val,context=self.ctxt)
             
                 
         @property
         @inlineCallbacks
         def bytesize(self):
-            resp=yield self.ser.bytesize(None, context=self.ctxt)
+            resp=yield self.ser.bytesize(None,context=self.ctxt)
             returnValue(resp)
                 
                 
         @bytesize.setter
         @inlineCallbacks
         def bytesize(self, val):
-            yield self.ser.bytesize(val, context=self.ctxt)
+            yield self.ser.bytesize(val,context=self.ctxt)
 
         @property
         @inlineCallbacks
         def parity(self):
-            resp=yield self.ser.parity(None, context=self.ctxt)
+            resp=yield self.ser.parity(None,context=self.ctxt)
             returnValue(resp)
                 
                 
         @parity.setter
         @inlineCallbacks
         def parity(self, val):
-            yield self.ser.parity(val, context=self.ctxt)
+            yield self.ser.parity(val,context=self.ctxt)
 
 
         @property
         @inlineCallbacks
         def stopbits(self):
-            resp=yield self.ser.stopbits(None, context=self.ctxt)
+            resp=yield self.ser.stopbits(None,context=self.ctxt)
             returnValue(resp)
                 
         @stopbits.setter
         @inlineCallbacks
         def stopbits(self, val):
-            yield self.ser.stopbits(val, context=self.ctxt)
+            yield self.ser.stopbits(val,context=self.ctxt)
              
         @property
         def dtr(self):
@@ -157,7 +160,7 @@ class CSSerialServer(CSPollingServer):
         @dtr.setter
         @inlineCallbacks
         def dtr(self, val):
-            yield self.ser.dtr(val, context=self.ctxt)
+            yield self.ser.dtr(val,context=self.ctxt)
 
         
         @property
@@ -167,7 +170,7 @@ class CSSerialServer(CSPollingServer):
         @rts.setter
         @inlineCallbacks
         def rts(self, val):
-            yield self.ser.rts(val, context=self.ctxt)
+            yield self.ser.rts(val,context=self.ctxt)
                 
 
 
@@ -178,14 +181,14 @@ class CSSerialServer(CSPollingServer):
         super().initServer()
         self.sim_devices=[]
         servers=yield self.client.manager.servers()
-		if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
-			HSS=self.client.servers['CS Hardware Simulating Server']
-            existing_device_list=yield HSS.get_devices_list(self.name)
-            self.sim_devices+=[SerialDevice(port,HSS) for port in existing_device_list]
-            yield HSS.signal__simulated_device_added(8675309)
-            yield HSS.signal__simulated_device_removed(8675310)
-            yield HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
-            yield HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
+        if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
+            self.HSS=self.client.servers['CS Hardware Simulating Server']
+            existing_device_list=yield self.HSS.get_devices_list(self.name)
+            self.sim_devices+=[SerialDevice(port,self.HSS) for port in existing_device_list]
+            yield self.HSS.signal__simulated_device_added(8675309)
+            yield self.HSS.signal__simulated_device_removed(8675310)
+            yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
+            yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
         self.enumerate_serial_pyserial()
 
     def _poll(self):
@@ -290,9 +293,7 @@ class CSSerialServer(CSPollingServer):
                         else:
                             raise Error(code=3, msg=e.message)
                             
-                    except SimSerialDeviceError as e:
-                        raise Error(code=2, msg=e.message) #should this be combined with error code 3?
-
+                
         raise Error(code=1, msg='Unknown port %s' % (port,))
 
     
@@ -312,7 +313,7 @@ class CSSerialServer(CSPollingServer):
 
     def create_serial_connection(self,serial_device):
         if serial_device.HSS:
-            return self.DeviceConnection(serial_device.HSS,serial_device.name)
+            return self.DeviceConnection(serial_device.HSS,self.name,serial_device.name,self.client.context())
         else:
             return Serial(serial_device.devicepath, timeout=0)
                 
@@ -377,7 +378,7 @@ class CSSerialServer(CSPollingServer):
         ser = self.getPort(c)
         timeout_val=min(data['s'], 300)
         ser.timeout=timeout_val
-        return Value(ser.timeout, 's')
+        returnValue(ser.timeout, 's')
 
 
     # FLOW CONTROL
@@ -576,7 +577,7 @@ class CSSerialServer(CSPollingServer):
         """
         
         ser = self.getPort(c)
-        yield ser.reset_input_buffer()
+        ser.reset_input_buffer()
 
     @setting(62, 'Flush Output', returns='')
     def flush_output(self, c):
@@ -585,7 +586,7 @@ class CSSerialServer(CSPollingServer):
         """
         
         ser = self.getPort(c)
-        yield ser.reset_output_buffer()
+        ser.reset_output_buffer()
 
     @setting(63, 'Buffer Size', size='i', returns='')
     def buffer_size(self, c, size):
@@ -625,17 +626,13 @@ class CSSerialServer(CSPollingServer):
 
     @setting(71, 'Add Simulated Device', port='s', returns='')
     def add_simulated_device(self, c, port,device_type):
-        servers=yield self.client.manager.servers()
-		if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
-			HSS=self.client.servers['CS Hardware Simulating Server']
-            yield HSS.add_simulated_device(self.name,port,device_type)
+        if self.HSS:
+            yield self.HSS.add_simulated_device(self.name,port,device_type)
         
     @setting(72, 'Remove Simulated Device', port='s', returns='')
     def remove_simulated_device(self, c, port):
-        servers=yield self.client.manager.servers()
-		if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
-			HSS=self.client.servers['CS Hardware Simulating Server']
-            yield HSS.remove_simulated_device(self.name,port)    
+        if self.HSS:
+            yield self.HSS.remove_simulated_device(self.name,port)    
 
 
     # SIGNALS
@@ -646,18 +643,19 @@ class CSSerialServer(CSPollingServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-		if name=='CS Hardware Simulating Server':
-			yield self.client.refresh()
-			HSS=self.client.servers['CS Hardware Simulating Server']
-            yield HSS.signal__simulated_device_added(8675309)
-            yield HSS.signal__simulated_device_removed(8675310)
-            yield HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
-            yield HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
+        if name=='CS Hardware Simulating Server':
+            yield self.client.refresh()
+            self.HSS=self.client.servers['CS Hardware Simulating Server']
+            yield self.HSS.signal__simulated_device_added(8675309)
+            yield self.HSS.signal__simulated_device_removed(8675310)
+            yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
+            yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
             
     # SIGNALS
     def serverDisconnected(self, ID, name):
-		if name=='CS Hardware Simulating Server':
+        if name=='CS Hardware Simulating Server':
             self.sim_devices=[]
+            self.HSS=None
         
             
     
@@ -667,17 +665,18 @@ class CSSerialServer(CSPollingServer):
         node, port=data
         cli=self.client
         if node==self.name:
-            HSS=cli.servers['CS Hardware Simulating Server']
-            self.sim_devices.append(SerialDevice(port,None, HSS()))
+            self.sim_devices.append(SerialDevice(port,None, self.HSS))
    
    
     def simDeviceRemoved(self, c, data):
-		node, port=data
+        node, port=data
         if node==self.name:
-			for device in self.sim_devices:
-				if device.name==port:
-					self.sim_devices.remove(device)
-					break
+            for device in self.sim_devices:
+                print(device.name)
+                print(port)
+                if device.name==port:
+                    self.sim_devices.remove(device)
+                    break
    
    
    

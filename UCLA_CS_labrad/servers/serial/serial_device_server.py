@@ -186,40 +186,41 @@ class CSSerialDeviceServer(LabradServer):
         Wrapper for our server's client connection to the serial server.
         @raise labrad.types.Error: Error in opening serial connection
         """
-        def __init__(self, ser, port, **kwargs):
+        def __init__(self, ser, context, port, **kwargs):
             # parse kwargs
             timeout = kwargs.get('timeout')
             baudrate = kwargs.get('baudrate')
             bytesize = kwargs.get('bytesize')
             parity = kwargs.get('parity')
             stopbits = kwargs.get('stopbits')
+            self.ctxt=context
             # serial parameters
-            ser.open(port)
+            ser.open(port,context=self.ctxt)
            
-            if timeout is not None: ser.timeout(timeout)
-            if baudrate is not None: ser.baudrate(baudrate)
-            if bytesize is not None: ser.bytesize(bytesize)
-            if parity is not None: ser.parity(parity)
-            if stopbits is not None: ser.stopbits(stopbits)
+            if timeout is not None: ser.timeout(timeout,context=self.ctxt)
+            if baudrate is not None: ser.baudrate(baudrate,context=self.ctxt)
+            if bytesize is not None: ser.bytesize(bytesize,context=self.ctxt)
+            if parity is not None: ser.parity(parity,context=self.ctxt)
+            if stopbits is not None: ser.stopbits(stopbits,context=self.ctxt)
             # serial r/w
-            self.write = lambda s: ser.write(s)
-            self.write_line = lambda s: ser.write_line(s)
-            self.read = lambda x = 0: ser.read(x)
-            self.read_line = lambda x = '': ser.read_line(x)
-            self.read_as_words = lambda x = 0: ser.read_as_words(x)
+            self.write = lambda s: ser.write(s,context=self.ctxt)
+            self.write_line = lambda s: ser.write_line(s,context=self.ctxt)
+            self.read = lambda x = 0: ser.read(x,context=self.ctxt)
+            self.read_line = lambda x = '': ser.read_line(x,context=self.ctxt)
+            self.read_as_words = lambda x = 0: ser.read_as_words(x,context=self.ctxt)
             # other
-            self.close = lambda: ser.close()
-            self.flush_input = lambda: ser.flush_input()
-            self.flush_output = lambda: ser.flush_output()
+            self.close = lambda: ser.close(context=self.ctxt)
+            self.flush_input = lambda: ser.flush_input(context=self.ctxt)
+            self.flush_output = lambda: ser.flush_output(context=self.ctxt)
             self.ID = ser.ID
             # comm lock
             self.comm_lock = DeferredLock()
-            self.acquire = lambda: self.comm_lock.acquire()
-            self.release = lambda: self.comm_lock.release()
+            self.acquire = lambda: self.comm_lock.acquire(context=self.ctxt)
+            self.release = lambda: self.comm_lock.release(context=self.ctxt)
             # buffer
-            self.buffer_size = lambda size: ser.buffer_size(size)
-            self.buffer_input_waiting = lambda: ser.in_waiting
-            self.buffer_output_waiting = lambda: ser.out_waiting
+            self.buffer_size = lambda size: ser.buffer_size(size,context=self.ctxt)
+            self.buffer_input_waiting = lambda: ser.in_waiting(context=self.ctxt)
+            self.buffer_output_waiting = lambda: ser.out_waiting(context=self.ctxt)
 
 
     # SETUP
@@ -321,7 +322,7 @@ class CSSerialDeviceServer(LabradServer):
             # get server wrapper for serial server
             ser = cli.servers[serStr]
             # instantiate SerialConnection convenience class
-            serial_connection_dict[(serStr,port)]=self.SerialConnection(ser=ser(), port=port, **kwargs)
+            serial_connection_dict[(serStr,port)]=self.SerialConnection(ser, self.client.context(), port, **kwargs)
             
             
             # clear input and output buffers

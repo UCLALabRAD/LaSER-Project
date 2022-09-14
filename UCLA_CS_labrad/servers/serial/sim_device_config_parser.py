@@ -11,7 +11,10 @@ class SimDeviceConfig(object):
         self.description = description
         self.version = version
         self.version_tuple = version_tuple(version)
-        self.package=os.path.join(path, filename)
+        self.module_path=os.path.join(path,filename)
+        self.module_name=filename[:-3]
+        self.filename=filename
+		
 
 
 
@@ -30,7 +33,7 @@ def from_string(conf, filename=None, path=None):
     else:
         version = '0.0'
 
-    return ServerConfig(name, description, version,
+    return SimDeviceConfig(name, description, version,
                         path, filename)
 
 
