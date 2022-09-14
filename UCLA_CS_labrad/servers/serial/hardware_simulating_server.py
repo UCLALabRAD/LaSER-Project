@@ -242,7 +242,7 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(61, 'Select Device', node='s', port='s', returns='')
     def select_device(self,c,node,port):
         if 'Device' in c:
-            print("NOOOO")
+            pass
         if (node,port) not in self.devices:
             pass
         c['Device']=self.devices[(node,port)]

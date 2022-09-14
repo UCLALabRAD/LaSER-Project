@@ -215,8 +215,8 @@ class CSSerialDeviceServer(LabradServer):
             self.ID = ser.ID
             # comm lock
             self.comm_lock = DeferredLock()
-            self.acquire = lambda: self.comm_lock.acquire(context=self.ctxt)
-            self.release = lambda: self.comm_lock.release(context=self.ctxt)
+            self.acquire = lambda: self.comm_lock.acquire()
+            self.release = lambda: self.comm_lock.release()
             # buffer
             self.buffer_size = lambda size: ser.buffer_size(size,context=self.ctxt)
             self.buffer_input_waiting = lambda: ser.in_waiting(context=self.ctxt)
@@ -322,16 +322,16 @@ class CSSerialDeviceServer(LabradServer):
             # get server wrapper for serial server
             ser = cli.servers[serStr]
             # instantiate SerialConnection convenience class
-            serial_connection_dict[(serStr,port)]=self.SerialConnection(ser, self.client.context(), port, **kwargs)
+            self.serial_connection_dict[(serStr,port)]=self.SerialConnection(ser, self.client.context(), port, **kwargs)
             
             
             # clear input and output buffers
-            serial_connection_dict[(serStr,port)].flush_input()
-            serial_connection_dict[(serStr,port)].flush_output()
+            yield self.serial_connection_dict[(serStr,port)].flush_input()
+            yield self.serial_connection_dict[(serStr,port)].flush_output()
             print('Serial connection opened.')
         except Error as e:
-            if (serStr,port) in serial_connection_dict:
-                del serial_connection_dict[(serStr,port)]
+            if (serStr,port) in self.serial_connection_dict:
+                del self.serial_connection_dict[(serStr,port)]
             raise Error(code=1, msg=e.message)
 
     @inlineCallbacks
@@ -406,7 +406,7 @@ class CSSerialDeviceServer(LabradServer):
                     (str,str): the connected node and port (empty if no connection)
         """
         # do nothing if device is already selected
-        if c['Serial Connection']:
+        if 'Serial Connection' in c and c['Serial Connection']:
             Exception('A serial device is already opened.')
         # set parameters if specified
         elif (node is not None) and (port is not None):

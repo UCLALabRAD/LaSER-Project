@@ -58,15 +58,15 @@ class CSPiezoServer(CSSerialDeviceServer):
                             (bool)  : whether the device accepts serial commands
         """
         if remote_status is not None:
-            yield self.ser.acquire()
-            yield self.ser.write('remote.w {:d}\r\n'.format(remote_status))
-            yield self.ser.read_line('\n')
-            self.ser.release()
+            yield c['Serial Connection'].acquire()
+            yield c['Serial Connection'].write('remote.w {:d}\r\n'.format(remote_status))
+            yield c['Serial Connection'].read_line('\n')
+            c['Serial Connection'].release()
         # getter
-        yield self.ser.acquire()
-        yield self.ser.write('remote.r\r\n')
-        resp = yield self.ser.read_line('\n')
-        self.ser.release()
+        yield c['Serial Connection'].acquire()
+        yield c['Serial Connection'].write('remote.r\r\n')
+        resp = yield c['Serial Connection'].read_line('\n')
+        c['Serial Connection'].release()
         if resp.strip() == 'enabled':
             returnValue(True)
         else:
@@ -87,15 +87,15 @@ class CSPiezoServer(CSSerialDeviceServer):
         if channel not in (0, 1, 2, 3):
             raise Exception("Error: channel must be one of (0, 1, 2, 3).")
         if power is not None:
-            yield self.ser.acquire()
-            yield self.ser.write('out.w {:d} {:d}\r\n'.format(channel, power))
-            yield self.ser.read_line('\n')
-            self.ser.release()
+            yield c['Serial Connection'].acquire()
+            yield c['Serial Connection'].write('out.w {:d} {:d}\r\n'.format(channel, power))
+            yield c['Serial Connection'].read_line('\n')
+            c['Serial Connection'].release()
         # getter
-        yield self.ser.acquire()
-        yield self.ser.write('out.r {:d}\r\n'.format(channel))
-        resp = yield self.ser.read_line('\n')
-        self.ser.release()
+        yield c['Serial Connection'].acquire()
+        yield c['Serial Connection'].write('out.r {:d}\r\n'.format(channel))
+        resp = yield c['Serial Connection'].read_line('\n')
+        c['Serial Connection'].release()
         if resp.strip() == 'enabled':
             returnValue(True)
         else:
@@ -119,15 +119,15 @@ class CSPiezoServer(CSSerialDeviceServer):
         if voltage is not None:
             if (voltage < 0) or (voltage > 150):
                 raise Exception("Error: voltage must be in [0, 150].")
-            yield self.ser.acquire()
-            yield self.ser.write('vout.w {:d} {:3f}\r\n'.format(channel, voltage))
-            yield self.ser.read_line('\n')
-            self.ser.release()
+            yield c['Serial Connection'].acquire()
+            yield c['Serial Connection'].write('vout.w {:d} {:3f}\r\n'.format(channel, voltage))
+            yield c['Serial Connection'].read_line('\n')
+            c['Serial Connection'].release()
         # getter
-        yield self.ser.acquire()
-        yield self.ser.write('vout.r {:d}\r\n'.format(channel))
-        resp = yield self.ser.read_line('\n')
-        self.ser.release()
+        yield c['Serial Connection'].acquire()
+        yield c['Serial Connection'].write('vout.r {:d}\r\n'.format(channel))
+        resp = yield c['Serial Connection'].read_line('\n')
+        c['Serial Connection'].release()
         returnValue(float(resp))
         
     

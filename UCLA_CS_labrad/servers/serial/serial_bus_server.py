@@ -239,8 +239,7 @@ class CSSerialServer(CSPollingServer):
     def getPort(self,c):
         try:
             port_obj=c['PortObject']
-            #would be nice to do a dummy write or read here so we can handle an error right here if device was "unplugged"
-            return c['PortObject']
+            return port_obj
         except Exception as e:
             raise Error(code=3,msg=e.message)
             
@@ -284,8 +283,8 @@ class CSSerialServer(CSPollingServer):
         for x in self.SerialPorts:
             if os.path.normcase(x.name) == os.path.normcase(port) or x.name==port:
                     try:
-                        c['PortObject'] = yield self.create_serial_connection(x)
-                        returnValue(x.name)
+                        c['PortObject'] = self.create_serial_connection(x)
+                        return x.name
 
                     except SerialException as e:
                         if e.message.find('cannot find') >= 0:
@@ -310,7 +309,7 @@ class CSSerialServer(CSPollingServer):
     
 
 
-
+	
     def create_serial_connection(self,serial_device):
         if serial_device.HSS:
             return self.DeviceConnection(serial_device.HSS,self.name,serial_device.name,self.client.context())
