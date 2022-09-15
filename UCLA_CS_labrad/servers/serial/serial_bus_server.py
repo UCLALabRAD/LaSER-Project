@@ -194,16 +194,18 @@ class CSSerialServer(CSPollingServer):
             self.HSS=self.client.servers['CS Hardware Simulating Server']
             existing_device_list=yield self.HSS.get_devices_list(self.name)
             self.sim_devices+=[SerialDevice(port,None,self.HSS) for port in existing_device_list]
+            print(self.sim_devices)
             yield self.HSS.signal__simulated_device_added(8675309)
             yield self.HSS.signal__simulated_device_removed(8675310)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
-        self.enumerate_serial_pyserial()
-
+        yield self.enumerate_serial_pyserial()
+        
+    @inlineCallbacks  #SHOULD THIS BE YIELDED?
     def _poll(self):
-        self.enumerate_serial_pyserial()
+        yield self.enumerate_serial_pyserial()
 
- 
+    @inlineCallbacks
     def enumerate_serial_pyserial(self):
         """
         This uses the pyserial built-in device enumeration.
@@ -217,7 +219,7 @@ class CSSerialServer(CSPollingServer):
         each port and ignore it if we can't.
         """
         
-        self.clean_up_contexts()        
+        yield self.clean_up_contexts()        
         dev_list = list_ports.comports()
         not_in_use_dev_list=[]
         in_use_port_list=[context_obj.data['PortObject'].port  for context_obj in self.contexts.values() if (('PortObject' in context_obj.data) and context_obj.data['PortObject'])]
@@ -260,9 +262,10 @@ class CSSerialServer(CSPollingServer):
             if not port_obj:
                 continue
             elif isinstance(port_obj,self.DeviceConnection):
-                try:
+                try:       
                     yield ctxt_dict['PortObject'].write(b'')
-                except:
+                except Error as e:
+                    print(ctxt_dict['PortObject'].port+str(e))
                     ctxt_dict['PortObject']=None
                     pass
                     
@@ -324,9 +327,7 @@ class CSSerialServer(CSPollingServer):
                         if e.message.find('cannot find') >= 0:
                             raise Error(code=1, msg=e.message)
                         else:
-                            raise Error(code=3, msg=e.message)
-                            
-                
+                            raise Error(code=3, msg=e.message) 
         raise Error(code=1, msg='Unknown port %s' % (port))
 
     
@@ -685,20 +686,23 @@ class CSSerialServer(CSPollingServer):
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
             
     # SIGNALS
+    @inlineCallbacks
     def serverDisconnected(self, ID, name):
         if name=='CS Hardware Simulating Server':
-            self.sim_device_names=[]
-         
+            self.sim_devices=[]
+            yield self.HSS.removeListener(listener=self.simDeviceAdded,source = None,ID=8675309)
+            yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
             self.HSS=None
-        
             
     
+        
 
 
     def simDeviceAdded(self, c,data):
         node, port=data
         cli=self.client
         if node==self.name:
+            print('Added')
             self.sim_devices.append(SerialDevice(port,None, self.HSS))
    
    
@@ -706,8 +710,6 @@ class CSSerialServer(CSPollingServer):
         node, port=data
         if node==self.name:
             for device in self.sim_devices:
-                print(device.name)
-                print(port)
                 if device.name==port:
                     self.sim_devices.remove(device)
                     break
