@@ -28,7 +28,7 @@ STATUS_TYPE = '*(s{name} s{desc} s{ver})'
 __all__ = ['SerialDevice','CSHardwareSimulatingServer','SimulatedDeviceError']
 
 class HSSError(Exception):
-    errorDict ={0: 'Port in Use',1: 'No device at port'}
+    errorDict ={ 0:'Device already exists at specified node and port',1:'No device exists at specified node and port',2: 'Device type not supported.',3: 'No directories for Simulated Device files found in registry',4:'One or more simulated device info blocks were not successfully parsed in directory.', 5:'Unable to find class for desired device in module'}
 
     def __init__(self, code):
         self.code = code
@@ -38,7 +38,7 @@ class HSSError(Exception):
             return self.errorDict[self.code]
             
 class SimulatedDeviceError(Exception):
-    errorDict ={0: 'Unsupported Value for Serial Connection Parameter'}
+    errorDict ={0:'Serial command not supported by device.', 1: 'Unsupported Value for Serial Connection Parameter'}
 
     def __init__(self, code):
         self.code = code
@@ -72,7 +72,9 @@ class SerialDevice(object):
     def interpret_serial_command(self, cmd):
         cmd,*args=cmd.split(" ")
         if (cmd,len(args)) not in self.command_dict:
-            print('wrong')
+            raise SimulatedDeviceError(0)
+        elif not self.command_dict[(cmd,len(args))]:
+            pass
         else:
             return self.command_dict[(cmd,len(args))](*args)
         
@@ -89,8 +91,21 @@ class CSHardwareSimulatingServer(LabradServer):
     def initServer(self):
         super().initServer()
         self.devices={}
-        self.HSS_config_dirs=yield self._getSimDeviceDirectories(self.registryDirectory)
-        self.refreshDeviceTypes()
+        try:
+            self.HSS_config_dirs=yield self._getSimDeviceDirectories(self.registryDirectory)
+            if not self.HSS_config_dirs or len(self.HSS_config_dirs)==0:
+                raise Error()
+        except:
+            raise HSSError(3)
+        try:
+            self.refreshDeviceTypes()
+            if len(self.device_configs)==0:
+                raise Error()
+        except:
+            raise HSSError(4)
+
+    def initContext(self,c):
+        c['Device']=None
             
             
     def refreshDeviceTypes(self):
@@ -167,6 +182,8 @@ class CSHardwareSimulatingServer(LabradServer):
 
     @setting(11, 'Read', count='i', returns='s')
     def read(self,c,count):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         write_out,rest=active_device.input_buffer[:count],active_device.input_buffer[count:]
         active_device.input_buffer=rest
@@ -175,16 +192,14 @@ class CSHardwareSimulatingServer(LabradServer):
     
     @setting(12, 'Write', data='s', returns='')
     def write(self,c,data):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         active_device.output_buffer.extend(data.encode())
         *cmds, rest=active_device.output_buffer.decode().split("\r\n")
         for cmd in cmds:
             command_interpretation=active_device.interpret_serial_command(cmd)
             active_device.input_buffer.extend(command_interpretation.encode())
-
-            
-            
-            
                 
         active_device.output_buffer=bytearray(rest.encode())
     
@@ -194,79 +209,83 @@ class CSHardwareSimulatingServer(LabradServer):
     
     @setting(31, 'Add Simulated Device', node='s',port='s', device_type='s',returns='')
     def add_device(self, c, node, port,device_type):
-        if port in self.devices:
+        if (node,port) in self.devices:
             raise HSSError(0)
         if device_type not in self.device_configs:
-            raise HSSError(0)
+            raise HSSError(2)
         spec = importlib.util.spec_from_file_location(self.device_configs[device_type].module_name,self.device_configs[device_type].module_path)
         module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        DevClass=getattr(module,device_type)
-        self.devices[(node,port)]=DevClass()
+        spec.loader.exec_module(module) #possible safety issue- shouldnt have to run ANYTHING
+        try:
+            DevClass=getattr(module,device_type)
+            self.devices[(node,port)]=DevClass()
+        except:
+            raise HSSError(5)
         self.device_added((node,port))
         
         
     @setting(32, 'Remove Simulated Device', node='s', port='s', returns='')
     def remove_device(self,c, node, port):
-        if (node,port) in self.devices: 
-                  for context_obj in self.contexts.values():
-                    if 'Device' in context_obj.data and context_obj.data['Device'] is self.devices[(node,port)]:
-                        del context_obj.data['Device']
-                        break
-                  del self.devices[(node,port)]
-        else:
+        if (node,port) not in self.devices: 
             raise HSSError(1)
+        
+        for context_obj in self.contexts.values():
+            if context_obj.data['Device'] is self.devices[(node,port)]:
+                context_obj.data['Device']=None
+                break
+        del self.devices[(node,port)]
+
         self.device_removed((node,port))
     
     @setting(41, 'Get In-Waiting', returns='i')
     def get_in_waiting(self,c):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         return len(active_device.input_buffer)
     
     @setting(42, 'Get Out-Waiting', returns='i')
     def get_out_waiting(self,c):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         return len(active_device.output_buffer)
     
     
     @setting(51, 'Reset Input Buffer', returns='')
     def reset_input_buffer(self,c):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         active_device.input_buffer=bytearray(b'')
     
     @setting(52, 'Reset Output Buffer', returns='')
     def reset_output_buffer(self,c):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         active_device.output_buffer=bytearray(b'')
 
     @setting(61, 'Select Device', node='s', port='s', returns='')
     def select_device(self,c,node,port):
-        if 'Device' in c:
-            pass
-        if (node,port) not in self.devices:
-            pass
         c['Device']=self.devices[(node,port)]
-        print(len(self.contexts))
         self.device_removed((node,port))
       
     @setting(62, 'Deselect Device',returns='')
     def deselect_device(self,c,node):
-        if 'Device' in c:
-                  for node,port in self.devices:
-                        if self.devices[(node,port)]==c['Device']:
-                            self.device_added((node,port))
-                            break
+        for node,port in self.devices:
+            if self.devices[(node,port)]==c['Device']:
+                self.device_added((node,port))
+                break
                         
-                  del c['Device']
-        else:
-            pass
+        c['Device']=None
 
     @setting(71, 'Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
     def baudrate(self,c,val):
         active_device=c['Device']
         if val:
             if val!=active_device.required_baudrate:
-                raise SimulatedDeviceError(0)
+                raise SimulatedDeviceError(1)
             else:
                 active_device.actual_baudrate=val
         return active_device.actual_baudrate
@@ -276,7 +295,7 @@ class CSHardwareSimulatingServer(LabradServer):
         active_device=c['Device']
         if val:
             if val!=active_device.required_bytesize:
-                raise SimulatedDeviceError(0)
+                raise SimulatedDeviceError(1)
             else:
                 active_device.actual_bytesize=val
         return active_device.actual_bytesize
@@ -286,7 +305,7 @@ class CSHardwareSimulatingServer(LabradServer):
         active_device=c['Device']
         if val:
             if val!=active_device.required_parity:
-                raise SimulatedDeviceError(0)
+                raise SimulatedDeviceError(1)
             else:
                 active_device.actual_parity=val
         return active_device.actual_parity
@@ -295,7 +314,7 @@ class CSHardwareSimulatingServer(LabradServer):
     def stopbits(self,c,val):
         active_device=c['Device']
         if val!=active_device.required_stopbits:
-            raise SimulatedDeviceError(0)
+            raise SimulatedDeviceError(1)
         else:
             active_device.actual_stopbits=val
         return active_device.actual_stopbits
@@ -305,7 +324,7 @@ class CSHardwareSimulatingServer(LabradServer):
         active_device=c['Device']
  
         if val!=active_device.required_rts:
-            raise SimulatedDeviceError(0)
+            raise SimulatedDeviceError(1)
         else:
             active_device.actual_rts=val
         return active_device.actual_rts
@@ -315,7 +334,7 @@ class CSHardwareSimulatingServer(LabradServer):
         active_device=c['Device']
  
         if val!=active_device.required_dtr:
-            raise SimulatedDeviceError(0)
+            raise SimulatedDeviceError(1)
         else:
             active_device.actual_dtr=val
         return active_device.actual_dtr
@@ -323,6 +342,8 @@ class CSHardwareSimulatingServer(LabradServer):
         
     @setting(81, 'Buffer Size', returns='')
     def buffer_size(self,c):
+        if not c['Device']:
+            raise HSSError(1)
         return 0
         
     @setting(91, 'Get Devices List',node_name='s', returns='*s')

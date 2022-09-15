@@ -54,34 +54,39 @@ class CSSerialServer(CSPollingServer):
         @raise labrad.types.Error: Error in opening serial connection
         """
         def __init__(self, hss, node, port,context):
-			
+         
             self.port=port
-			
+         
             self.ctxt=context
+         
+            self.ser=hss
         
             self.name="Simulated Device at Node "+ node +", Port "+ port
             
             self.timeout=1
             
-            self.open= lambda: hss.select_device(node, port,context=self.ctxt)
+            self.open= lambda: self.ser.select_device(node, port,context=self.ctxt)
             
             self.open()
             
-            self.ser=hss
             
-            self.close = lambda: hss.deselect_device(context=self.ctxt)
+      
             
-            self.reset_input_buffer= lambda: hss.reset_input_buffer(context=self.ctxt)
-            self.reset_output_buffer= lambda: hss.reset_output_buffer(context=self.ctxt)
+            self.reset_input_buffer= lambda: self.ser.reset_input_buffer(context=self.ctxt)
+            self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
             
             
             self.set_buffer_size= lambda size: None
             
             
 
-            
-            
-            
+        @inlineCallbacks
+        def close(self):
+            try:
+                yield self.ser.deselect_device(context=self.ctxt)
+            except:
+                pass
+         
         @property
         @inlineCallbacks
         def in_waiting(self):
@@ -171,11 +176,15 @@ class CSSerialServer(CSPollingServer):
         @inlineCallbacks
         def rts(self, val):
             yield self.ser.rts(val,context=self.ctxt)
-                
+               
 
 
 
-
+               
+    def initContext(self,c):
+        c['PortObject']=None
+        
+        
     @inlineCallbacks
     def initServer(self):
         super().initServer()
@@ -184,7 +193,7 @@ class CSSerialServer(CSPollingServer):
         if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
             self.HSS=self.client.servers['CS Hardware Simulating Server']
             existing_device_list=yield self.HSS.get_devices_list(self.name)
-            self.sim_devices+=[SerialDevice(port,self.HSS) for port in existing_device_list]
+            self.sim_devices+=[SerialDevice(port,None,self.HSS) for port in existing_device_list]
             yield self.HSS.signal__simulated_device_added(8675309)
             yield self.HSS.signal__simulated_device_removed(8675310)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
@@ -207,13 +216,12 @@ class CSSerialServer(CSPollingServer):
         Following the example from the above windows version, we try to open
         each port and ignore it if we can't.
         """
-
+        
+        self.clean_up_contexts()        
         dev_list = list_ports.comports()
         not_in_use_dev_list=[]
         in_use_port_list=[context_obj.data['PortObject'].port  for context_obj in self.contexts.values() if (('PortObject' in context_obj.data) and context_obj.data['PortObject'])]
-        #print(in_use_port_list)
         for dev in dev_list:
-            #print(dev[0])
             if dev[0] not in in_use_port_list:
                 not_in_use_dev_list.append(dev)
         connected_phys_devices=[]
@@ -232,16 +240,42 @@ class CSSerialServer(CSPollingServer):
         port_list_tmp = [x.name for x in self.SerialPorts]
         self.port_update(self.name, port_list_tmp)
 
+
     def expireContext(self, c):
         if 'PortObject' in c:
             yield c['PortObject'].close()
             
     def getPort(self,c):
         try:
-            port_obj=c['PortObject']
-            return port_obj
-        except Exception as e:
-            raise Error(code=3,msg=e.message)
+            if not c['PortObject']:
+                raise Error()
+        except:
+            raise NoPortSelectedError()
+        return c['PortObject']
+
+    @inlineCallbacks
+    def clean_up_contexts(self):
+        for ctxt_dict in [ctxt.data for ctxt in self.contexts.values()]:
+            port_obj=ctxt_dict['PortObject']
+            if not port_obj:
+                continue
+            elif isinstance(port_obj,self.DeviceConnection):
+                try:
+                    yield ctxt_dict['PortObject'].write(b'')
+                except:
+                    ctxt_dict['PortObject']=None
+                    pass
+                    
+            else:
+                try:
+                    ser = Serial(port_obj.port,exclusive=True)
+                    ser.close()
+                    ctxt_dict['PortObject']=None
+                except:
+                    pass
+        
+            
+             
             
 #Get Information About Ports
     @setting(10, 'List Serial Ports', returns='*s: List of serial ports')
@@ -276,9 +310,9 @@ class CSSerialServer(CSPollingServer):
         on Linux.  For compatibility, always use the same case.
         """
         
-        if 'PortObject' in c:
+        if 'PortObject' in c and c['PortObject']:
             yield c['PortObject'].close()
-            del c['PortObject']
+            c['PortObject']=None
             
         for x in self.SerialPorts:
             if os.path.normcase(x.name) == os.path.normcase(port) or x.name==port:
@@ -293,7 +327,7 @@ class CSSerialServer(CSPollingServer):
                             raise Error(code=3, msg=e.message)
                             
                 
-        raise Error(code=1, msg='Unknown port %s' % (port,))
+        raise Error(code=1, msg='Unknown port %s' % (port))
 
     
     
@@ -302,19 +336,19 @@ class CSSerialServer(CSPollingServer):
         """
         Closes the current serial port.
         """
-        if 'PortObject' in c:
+        if c['PortObject']:
             yield c['PortObject'].close()
-            del c['PortObject']
+            c['PortObject']=None
 
     
 
 
-	
+   
     def create_serial_connection(self,serial_device):
         if serial_device.HSS:
             return self.DeviceConnection(serial_device.HSS,self.name,serial_device.name,self.client.context())
         else:
-            return Serial(serial_device.devicepath, timeout=0)
+            return Serial(serial_device.devicepath, timeout=0,exclusive=True)
                 
 
 
@@ -653,7 +687,8 @@ class CSSerialServer(CSPollingServer):
     # SIGNALS
     def serverDisconnected(self, ID, name):
         if name=='CS Hardware Simulating Server':
-            self.sim_devices=[]
+            self.sim_device_names=[]
+         
             self.HSS=None
         
             

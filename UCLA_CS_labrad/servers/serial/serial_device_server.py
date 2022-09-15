@@ -209,7 +209,7 @@ class CSSerialDeviceServer(LabradServer):
             self.read_line = lambda x = '': ser.read_line(x,context=self.ctxt)
             self.read_as_words = lambda x = 0: ser.read_as_words(x,context=self.ctxt)
             # other
-            self.close = lambda: ser.close(context=self.ctxt)
+            self.close = lambda: ser.close_port(context=self.ctxt)
             self.flush_input = lambda: ser.flush_input(context=self.ctxt)
             self.flush_output = lambda: ser.flush_output(context=self.ctxt)
             self.ID = ser.ID
@@ -269,8 +269,9 @@ class CSSerialDeviceServer(LabradServer):
             conn.close()
             conn.release()
             
-    #def initContext(self,c):
-    #    pass
+    def initContext(self,c):
+	    c['Serial Connection']=None
+
         
     @inlineCallbacks
     def getPortFromReg(self, regDir=None):
@@ -382,10 +383,10 @@ class CSSerialDeviceServer(LabradServer):
         Close serial device connection (if we are connected).
         """
         for bus_server in [ser for (ser,port) in self.serial_connection_dict]:
-            if bus_server.ID == ID:
+            if bus_server == name:
                 print('Serial bus server '+name+' disconnected. Relaunch the serial server')
                 for context_obj in self.contexts.values():
-                    if 'Serial Connection' in context_obj.data:
+                    if context_obj.data['SerialConnection'] and context_obj.data['Serial Node']==name:
                         context_obj.data['Serial Connection']=None
                         context_obj.data['Serial Port'] = None
                         context_obj.data['Serial Node'] = None
@@ -407,7 +408,7 @@ class CSSerialDeviceServer(LabradServer):
         """
         # do nothing if device is already selected
         if 'Serial Connection' in c and c['Serial Connection']:
-            Exception('A serial device is already opened.')
+            raise Exception('A serial device is already opened.')
         # set parameters if specified
         elif (node is not None) and (port is not None):
             desired_node = node
