@@ -248,11 +248,8 @@ class CSSerialServer(CSPollingServer):
             yield c['PortObject'].close()
             
     def getPort(self,c):
-        try:
-            if not c['PortObject']:
-                raise Error()
-        except:
-            raise NoPortSelectedError()
+        if not c['PortObject']:
+            raise Error()
         return c['PortObject']
 
     @inlineCallbacks

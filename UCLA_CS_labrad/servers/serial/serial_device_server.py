@@ -165,8 +165,8 @@ class CSSerialDeviceServer(LabradServer):
     # node parameters
     name = 'CSSerialDevice'
     reg_key = None
-    default_port = None
-    default_node = None
+    default_port ='cu.usbserial-AM00QYUP'
+    default_node = 'landons-macbook-pro.local'
     
     
 
@@ -231,35 +231,21 @@ class CSSerialDeviceServer(LabradServer):
         # call parent initServer to support further subclassing
         super().initServer()
         # get default node and port from registry (this overrides hard-coded values)
-        if self.regKey is not None:
+        if self.reg_key is not None:
             print('RegKey specified. Looking in registry for default node and port.')
-            try:
-                node, port = yield self.getPortFromReg(self.regKey)
-                self.default_node = node
-                self.default_port = port
-            except Exception as e:
-                print('Unable to find default node and port in registry. Using hard-coded values if they exist.')
+
+            node, port = yield self.getPortFromReg(self.reg_key)
+            self.default_node = node
+            self.default_port = port
+
          #open connection on startup if default node and port are specified
 
         if self.default_node and self.default_port:
             print('Default node and port specified. Connecting to device on startup.')
-            try:
-                serStr = yield self.findSerial(self.default_node)
-                yield self.initSerial(serStr, self.default_port, baudrate=self.baudrate, timeout=self.timeout,
+            
+            serStr = yield self.findSerial(self.default_node)
+            yield self.initSerial(serStr, self.default_port, baudrate=self.baudrate, timeout=self.timeout,
                                       bytesize=self.bytesize, parity=self.parity,stopbits=self.stopbits)
-            except SerialConnectionError as e:
-                if e.code == 0:
-                    print('Could not find serial server for node: %s' % c['Serial Node'])
-                    print('Please start correct serial server')
-                elif e.code == 1 or e.code == 2:
-                    print('Serial Connection Error.')
-                else:
-                    raise Exception('Unknown connection error')
-            except Error:
-                # maybe check for serialutil.SerialException?
-                print('Unknown connection error')
-                raise
-
     @inlineCallbacks
     def stopServer(self):
         """
@@ -272,9 +258,17 @@ class CSSerialDeviceServer(LabradServer):
             conn.release()
             
     def initContext(self,c):
-        c['Serial Connection']=None
+        for node,port in self.serial_connection_dict:
+           if self._matchSerial(self.default_node,node) and port==self.default_port:
+               c['Serial Connection']= self.serial_connection_dict[(node,port)]
+               c['Serial Node']=node
+               c['Serial Port']=port
+               return
+        c['Serial Connection']= None
         c['Serial Node']=None
         c['Serial Port']=None
+        
+        
 
         
     @inlineCallbacks
@@ -323,19 +317,16 @@ class CSSerialDeviceServer(LabradServer):
         print('\ttimeout:\t%s\n\n' % (str(self.timeout) if kwargs.get('timeout') is not None else 'No timeout'))
         # find relevant serial server
         cli = self.client
-        try:
-            # get server wrapper for serial server
-            ser = cli.servers[serStr]
-            # instantiate SerialConnection convenience class
-            self.serial_connection_dict[(serStr,port)]=self.SerialConnection(ser, self.client.context(), port, **kwargs)
-            # clear input and output buffers
-            yield self.serial_connection_dict[(serStr,port)].flush_input()
-            yield self.serial_connection_dict[(serStr,port)].flush_output()
-            print('Serial connection opened.')
-        except Error as e:
-            if (serStr,port) in self.serial_connection_dict:
-                del self.serial_connection_dict[(serStr,port)]
-            raise Error(code=1, msg=e.message)
+   
+        # get server wrapper for serial server
+        ser = cli.servers[serStr]
+        # instantiate SerialConnection convenience class
+        self.serial_connection_dict[(serStr,port)]=self.SerialConnection(ser, self.client.context(), port, **kwargs)
+        # clear input and output buffers
+        yield self.serial_connection_dict[(serStr,port)].flush_input()
+        yield self.serial_connection_dict[(serStr,port)].flush_output()
+        print('Serial connection opened.')
+
 
     @inlineCallbacks
     def findSerial(self, serNode=None):
@@ -354,7 +345,7 @@ class CSSerialDeviceServer(LabradServer):
         try:
             returnValue([i[1] for i in servers if self._matchSerial(serNode, i[1])][0])
         except IndexError:
-            raise SerialConnectionError(0)
+            pass
 
     @staticmethod
     def _matchSerial(serNode, potMatch):
@@ -378,7 +369,9 @@ class CSSerialDeviceServer(LabradServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-        pass
+        if (c['Serial Connection'] is None) and self.default_port and self.default_node and (self._matchSerial(self.default_node, name)):
+            print(name, 'connected after we connected.')
+            yield self.deviceSelect(None)
 
     def serverDisconnected(self, ID, name):
         """
