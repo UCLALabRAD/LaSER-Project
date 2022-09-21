@@ -2,10 +2,10 @@ import numpy as np
 from labrad.gpib import GPIBDeviceWrapper
 from twisted.internet.defer import inlineCallbacks, returnValue
 
-_KEYSIGHTDS1204G_PROBE_ATTENUATIONS = (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000)
+_TEKTRONIXTDS2000_PROBE_ATTENUATIONS = ( 1, 10, 100, 1000)
 
 
-class KeysightDS1204GWrapper(GPIBDeviceWrapper):
+class TektronixTDS2000Wrapper(GPIBDeviceWrapper):
 
     # SYSTEM
     @inlineCallbacks
@@ -52,17 +52,17 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             string indicating the channel's coupling.
         """
-        chString = ':CHAN{:d}:COUP'.format(channel)
+        chString = 'CH{:d}:COUP'.format(channel)
         if coupling is not None:
             coupling = coupling.upper()
             if coupling in ('AC', 'DC', 'GND'):
                 yield self.write(chString + ' ' + coupling)
             else:
-                raise Exception('Error: Coupling must be one of: (AC, DC).')
+                raise Exception('Error: Coupling must be one of: (AC, DC, GND).')
         resp = yield self.query(chString + '?')
         returnValue(resp.strip())
 
-    @inlineCallbacks
+    @inlineCallbacks #TODO: change range (seems to depend on attenuation)
     def channel_scale(self, channel, scale=None):
         """
         Get or set the vertical scale.
@@ -72,7 +72,7 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             (float): The vertical scale (in volts/div).
         """
-        chString = ':CHAN{:d}:SCAL'.format(channel)
+        chString = 'CH{:d}:SCA'.format(channel)
         if scale is not None:
             if (scale > 1e-3) and (scale < 1e1):
                 yield self.write(chString + ' ' + str(scale))
@@ -92,12 +92,12 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             (float): the probe attenuation factor
         """
-        chString = ':CHAN{:d}:PROB'.format(channel)
+        chString = 'CH{:d}:PRO'.format(channel)
         if atten is not None:
-            if atten in _KEYSIGHTDS1204G_PROBE_ATTENUATIONS:
+            if atten in _TEKTRONIXTDS2000_PROBE_ATTENUATIONS:
                 yield self.write(chString + ' ' + str(atten))
             else:
-                raise Exception('Error: Probe attenuation must be one of: ' + str(_KEYSIGHTDS1204G_PROBE_ATTENUATIONS))
+                raise Exception('Error: Probe attenuation must be one of: ' + str(_TEKTRONIXTDS2000_PROBE_ATTENUATIONS))
         resp = yield self.query(chString + '?')
         returnValue(float(resp))
 
@@ -111,7 +111,7 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             (bool): The channel state.
         """
-        chString = ':CHAN{:d}:DISP'.format(channel)
+        chString = 'SEL:CH{:d}'.format(channel)
         if state is not None:
             yield self.write(chString + ' ' + str(int(state)))
         resp = yield self.query(chString + '?')
@@ -127,13 +127,18 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             (int): 0: not inverted, 1: inverted.
         """
-        chString = ":CHAN{:d}:INV".format(channel)
+        chString = ":CH{:d}:INV".format(channel)
         if invert is not None:
-            yield self.write(chString + ' ' + str(int(invert)))
+            if invert:
+                invert='ON'
+            else:
+                invert='OFF'
+            yield self.write(chString + ' ' + invert)
         resp = yield self.query(chString + '?')
-        returnValue(bool(int(resp)))
+        print(resp)
+        returnValue((resp=='ON'))
 
-    @inlineCallbacks
+    @inlineCallbacks  #TODO: change range (seems to depend on scale)
     def channel_offset(self, channel, offset=None):
         """
         Get or set the vertical offset.
@@ -145,7 +150,7 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
             (float): Vertical offset in units of divisions.
         """
         # value is in volts
-        chString = ":CHAN{:d}:OFFS".format(channel)
+        chString = ":CH{:d}:POS".format(channel)
         if offset is not None:
             if (offset > 1e-4) and (offset < 1e1):
                 yield self.write(chString + ' ' + str(offset))
@@ -166,10 +171,10 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
             (str): Trigger source.
         """
         # note: target channel must be on
-        chString = ':TRIG:EDG:SOUR'
+        chString = 'TRIG:MAI:EDGE:SOU'
         if channel is not None:
             if channel in (1, 2, 3, 4):
-                yield self.write(chString + ' CHAN' + str(channel))
+                yield self.write(chString + ' CH' + str(channel))
             else:
                 raise Exception('Error: Trigger channel must be one of: ' + str((1, 2, 3, 4)))
         resp = yield self.query(chString + '?')
@@ -184,18 +189,18 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             (str): the slope being triggered off
         """
-        chString = ':TRIG:EDG:SLOP'
+        chString = 'TRIG:MAI:EDGE:SLO'
         if slope is not None:
             slope = slope.upper()
-            if slope in ('POS', 'NEG', 'EITH', 'ALT'):
+            if slope in ('FALL', 'RIS'):
                 yield self.write(chString + ' ' + slope)
             else:
-                raise Exception('Error: Slope must be one of: ' + str(('POS', 'NEG', 'EITH', 'ALT')))
+                raise Exception('Error: Slope must be one of: ' + str(('FALL', 'RIS')))
         resp = yield self.query(chString + '?')
         returnValue(resp.strip())
 
-    @inlineCallbacks
-    def trigger_level(self, level=None):
+    @inlineCallbacks #fix range logic?
+    def trigger_level(self, channel, level=None):
         """
         Set or query the trigger level.
         Arguments:
@@ -204,7 +209,7 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             (float): the trigger level (in V).
         """
-        chString = ':TRIG:EDG:LEV'
+        chString = 'TRIG:MAI:LEV'
         if level is not None:
             chan_tmp = yield self.trigger_channel()
             vscale_tmp = yield self.channel_scale(int(chan_tmp[-1]))
@@ -225,7 +230,7 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             (str): The trigger mode.
         """
-        chString = ':TRIG:SWE'
+        chString = 'TRIG:MAI:MOD'
         if mode is not None:
             if mode in ('AUTO', 'NORM'):
                 yield self.write(chString + ' ' + mode)
@@ -236,7 +241,7 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
 
 
     # HORIZONTAL
-    @inlineCallbacks
+    @inlineCallbacks #TODO:Range change? horizontal position knob ( depends on scale)
     def horizontal_offset(self, offset=None):
         """
         Set or query the horizontal offset.
@@ -245,7 +250,7 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             (float): the horizontal offset in (in seconds).
         """
-        chString = ':TIM:POS'
+        chString = 'HOR:MAI:POS'
         if offset is not None:
             if (offset == 0) or ((abs(offset) > 1e-6) and (abs(offset) < 1e0)):
                 yield self.write(chString + ' ' + str(offset))
@@ -263,7 +268,7 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             (float): the horizontal scale (in s/div).
         """
-        chString = ':TIM:SCAL'
+        chString = 'HOR:MAI:SCA'
         if scale is not None:
             if (scale > 1e-6) and (scale < 50):
                 yield self.write(chString + ' ' + str(scale))
@@ -283,64 +288,42 @@ class KeysightDS1204GWrapper(GPIBDeviceWrapper):
         Returns:
             Tuple of ((ValueArray[s]) Time axis, (ValueArray[V]) Voltages).
         """
-        # first need to stop oscilloscope to record
-        yield self.write(':STOP')
 
-        # set channel to take trace on
-        yield self.write(':WAV:SOUR CHAN{:d}'.format(channel))
-        # use raw mode which gives us the entire on-screen waveform with full horizontal resolution
-        yield self.write(':WAV:POIN:MODE RAW')
-        # return format (default byte), use ASC or WORD for better vertical resolution
-        yield self.write(':WAV:FORM BYTE')
+        # configure trace
+        yield self.write('DAT:SOU CH{:d}'.format(channel))
+        yield self.write('DAT:STAR 1')
+        yield self.write('DAT:ENC ASCI')
+        yield self.write('DAT:STOP {:d}'.format(points))
 
-        # transfer waveform preamble
-        preamble = yield self.query(':WAV:PRE?')
-        # get waveform data
-        data = yield self.query(':WAV:DATA?')
-
-        # start oscope back up
-        yield self.write(':RUN')
-
+        # get preamble
+        preamble = yield self.query('WFMP?')
+        # get waveform
+        data = yield self.query('CURV?')
+        data=data[6:]
         # parse waveform preamble
-        points, xincrement, xorigin, xreference, yincrement, yorigin, yreference = yield self._parsePreamble(preamble)
+        points, xincrement, xorigin, yorigin, ymult, yoff = self._parsePreamble(preamble)
         # parse data
-        trace = yield self._parseByteData(data)
-
-        # convert data to volts
-        xAxis = (np.arange(points) * xincrement + xorigin)
-        yAxis = (trace - yorigin - yreference) * yincrement
+        trace = self._parseByteData(data)
+        # format data
+        xAxis = np.arange(points) * xincrement + xorigin
+        yAxis = (trace - yoff) * ymult + yorigin
         returnValue((xAxis, yAxis))
 
-
     # HELPER
-    def _parsePreamble(preamble):
-        """
-        <preamble_block> = <format 16-bit NR1>,
-                         <type 16-bit NR1>,
-                         <points 32-bit NR1>,
-                         <count 32-bit NR1>,
-                         <xincrement 64-bit floating point NR3>,
-                         <xorigin 64-bit floating point NR3>,
-                         <xreference 32-bit NR1>,
-                         <yincrement 32-bit floating point NR3>,
-                         <yorigin 32-bit floating point NR3>,
-                         <yreference 32-bit NR1>
-        """
-        fields = preamble.split(',')
-        points = int(fields[2])
-        xincrement, xorigin, xreference = float(fields[4: 7])
-        yincrement, yorigin, yreference = float(fields[7: 10])
+    def _parsePreamble(self, preamble):
+        fields = preamble.split(';')
+        points = int(fields[5])
+        xincrement = float(fields[8])
+        xorigin= float(fields[10])
+        yorigin=float(fields[13])
+        ymult=float(fields[12])
+        yoff=float(fields[14])
         # print(str((points, xincrement, xorigin, xreference, yincrement, yorigin, yreference)))
-        return (points, xincrement, xorigin, xreference, yincrement, yorigin, yreference)
+        return (points, xincrement, xorigin, yorigin, ymult, yoff)
 
-    def _parseByteData(data):
+    def _parseByteData(self, data):
         """
-        Parse byte data.
+        Parse byte data
         """
-        # get tmc header in #NXXXXXXXXX format
-        tmc_N = int(data[1])
-        tmc_length = int(data[2: 2 + tmc_N])
-        #print("tmc_N: " + str(tmc_N))
-        #print("tmc_length: " + str(tmc_length))
-        # use this return if return format is in bytes, otherwise need to adjust
-        return np.frombuffer(data[2 + tmc_N:], dtype=np.uint8)
+        trace = np.array(data.split(','), dtype=float)
+        return trace

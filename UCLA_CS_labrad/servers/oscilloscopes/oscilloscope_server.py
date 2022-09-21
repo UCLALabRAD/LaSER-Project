@@ -22,7 +22,7 @@ from labrad.gpib import GPIBManagedServer
 from RigolDS1000Z import RigolDS1000ZWrapper
 from TektronixMSO2000 import TektronixMSO2000Wrapper
 from KeysightDS1204G import KeysightDS1204GWrapper
-
+from TektronixTDS2000 import TektronixTDS2000Wrapper
 
 class CSOscilloscopeServer(GPIBManagedServer):
     """
@@ -33,8 +33,9 @@ class CSOscilloscopeServer(GPIBManagedServer):
 
     deviceWrappers = {
         'RIGOL TECHNOLOGIES DS1104Z Plus': RigolDS1000ZWrapper,
-        'TEKTRONIX TDS 2024C': TektronixMSO2000Wrapper,
-        'KEYSIGHT DS1204G': KeysightDS1204GWrapper
+        'TEKTRONIX MSO2024B': TektronixMSO2000Wrapper,
+        'KEYSIGHT DS1204G': KeysightDS1204GWrapper,
+        'TEKTRONIX TDS 2024C': TektronixTDS2000Wrapper
     }
 
 

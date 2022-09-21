@@ -9,7 +9,7 @@
 """
 ### BEGIN NODE INFO
 [info]
-name = CS GPIB Device Manager
+name = GPIB Device Manager
 version = 1.4.0
 description = Manages discovery and lookup of GPIB devices
 
@@ -40,7 +40,7 @@ def parseIDNResponse(s):
     return mfr.strip().upper() + ' ' + model.strip().upper()
 
 
-class CSGPIBDeviceManager(LabradServer):
+class GPIBDeviceManager(LabradServer):
     """
     Manages autodetection and identification of GPIB devices.
 
@@ -52,7 +52,7 @@ class CSGPIBDeviceManager(LabradServer):
     servers can register an identification setting to be called
     by the device manager to properly identify the device.
     """
-    name = 'CS GPIB Device Manager'
+    name = 'GPIB Device Manager'
     
     @inlineCallbacks
     def initServer(self):
@@ -342,7 +342,7 @@ class CSGPIBDeviceManager(LabradServer):
             del self.identFunctions[src]
 
 
-__server__ = CSGPIBDeviceManager()
+__server__ = GPIBDeviceManager()
 
 if __name__ == '__main__':
     from labrad import util
