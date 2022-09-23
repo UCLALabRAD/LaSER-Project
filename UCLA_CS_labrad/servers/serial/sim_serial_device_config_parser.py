@@ -5,7 +5,7 @@ import sys
 from configparser import ConfigParser
 
 
-class SimDeviceConfig(object):
+class SimSerialDeviceConfig(object):
     def __init__(self, name, description, version, path, filename):
         self.name = name
         self.description = description
@@ -40,8 +40,8 @@ def from_string(conf, filename=None, path=None):
 def find_config_block(path, filename):
     """Find a Node configuration block embedded in a file."""
     # markers to delimit node info block
-    BEGIN = b"### BEGIN SIMULATED DEVICE INFO"
-    END = b"### END SIMULATED DEVICE INFO"
+    BEGIN = b"### BEGIN SIMULATED SERIAL DEVICE INFO"
+    END = b"### END SIMULATED SERIAL DEVICE INFO"
     with open(os.path.join(path, filename), 'rb') as file:
         foundBeginning = False
         lines = []

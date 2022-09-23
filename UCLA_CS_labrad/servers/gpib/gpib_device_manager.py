@@ -77,6 +77,9 @@ class GPIBDeviceManager(LabradServer):
         # do an initial scan of the available GPIB devices
         yield self.refreshDeviceLists()
         
+
+
+               
     @inlineCallbacks
     def refreshDeviceLists(self):
         """

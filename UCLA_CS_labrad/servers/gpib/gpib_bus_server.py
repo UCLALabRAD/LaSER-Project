@@ -65,13 +65,68 @@ class CSGPIBBusServer(CSPollingServer):
     defaultTimeout = WithUnit(1.0, 's')
     POLL_ON_STARTUP = True
 
+	
+	class GPIBDeviceConnection(object):
+        """
+        Wrapper for our server's client connection to the serial server.
+        @raise labrad.types.Error: Error in opening serial connection
+        """
+        def __init__(self, hss, node, address,context):
+         
+            self.address=address
+         
+            self.ctxt=context
+         
+            self.ser=hss
+        
+            self.name="Simulated GPIB Device at Node "+ node +", Address "+ address
+            
+            self.timeout=1
+            
+            self.open= lambda: self.ser.gpib_select_device(node, address,context=self.ctxt)
+			
+			self.open()
+
+            self.write_termination=None
+			
+		@inlineCallbacks
+        def clear(self):
+            yield self.ser.gpib_reset_output_buffer(context=self.ctxt)
+			yield self.ser.gpib_reset_input_buffer(context=self.ctxt)
+
+			
+		@inlineCallbacks
+        def read_raw(self):
+            resp= yield self.ser.gpib_read(context=self.ctxt)
+            returnValue(resp.encode())
+			
+		@inlineCallbacks
+        def read_bytes(self,bytes):
+            resp= yield self.ser.gpib_read(bytes,context=self.ctxt)
+            returnValue(resp.encode())
+			
+        @inlineCallbacks
+        def write(self,data):
+            yield self.ser.gpib_write((data+self.write_termination),context=self.ctxt)
+	        returnValue(len(data))
+			
+			
+        @inlineCallbacks
+        def write_raw(self,data):
+            yield self.ser.gpib_write(data.decode(),context=self.ctxt)
+			returnValue(len(data))
+
+
+			
     def initServer(self):
         super().initServer()
         self.devices = {}
-        self.refreshDevices()
+        self.refreshPhysicalDevices()
 
+		
+		
     def _poll(self):
-        self.refreshDevices()
+        self.refreshPhysicalDevices()
 
     def refreshDevices(self):
         """
@@ -79,10 +134,13 @@ class CSGPIBBusServer(CSPollingServer):
         Currently supported are GPIB devices and GPIB over USB.
         """
         try:
+			#check name conflicts
+			
             rm = visa.ResourceManager()
             addresses = [str(x) for x in rm.list_resources()]
-            additions = set(addresses) - set(self.devices.keys())
-            deletions = set(self.devices.keys()) - set(addresses)
+			new_devices_list=addresses|self.sim_devices
+            additions = set(new_devices_list) - set(self.devices.keys())
+            deletions = set(self.devices.keys()) - set(new_devices_list)
             for addr in additions:
                 try:
                     if not addr.startswith(KNOWN_DEVICE_TYPES):
@@ -100,6 +158,7 @@ class CSGPIBBusServer(CSPollingServer):
             for addr in deletions:
                 del self.devices[addr]
                 self.sendDeviceMessage('GPIB Device Disconnect', addr)
+			
         except Exception as e:
             print('Problem while refreshing devices:', str(e))
             raise e
@@ -220,7 +279,48 @@ class CSGPIBBusServer(CSPollingServer):
     def _poll_fail(self, failure):
         print('Polling failed.')
 
+		
+		    # SIGNALS
+    @inlineCallbacks
+    def serverConnected(self, ID, name):
+        """
+        Attempt to connect to last connected serial bus server upon server connection.
+        """
+        # check if we aren't connected to a device, port and node are fully specified,
+        # and connected server is the required serial bus server
+        if name=='CS Hardware Simulating Server':
+            yield self.client.refresh()
+            self.HSS=self.client.servers['CS Hardware Simulating Server']
+            yield self.HSS.signal__simulated_gpib_device_added(8675311)
+            yield self.HSS.signal__simulated_gpib_device_removed(8675312)
+            yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675311)
+            yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
+            
+    # SIGNALS
+    @inlineCallbacks
+    def serverDisconnected(self, ID, name):
+        if name=='CS Hardware Simulating Server':
+            self.sim_devices=[]
+            yield self.HSS.removeListener(listener=self.simDeviceAdded,source = None,ID=8675311)
+            yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
+            self.HSS=None
+            
+    
+        
 
+
+    def simDeviceAdded(self, c,data):
+        node, address=data
+        cli=self.client
+        if node==self.name:
+            self.sim_devices[address]=self.GPIBDeviceConnection(self.HSS,self.name,address,self.client.context())
+   
+    def simDeviceRemoved(self, c, data):
+        node, address=data
+        if node==self.name:
+            del self.sim_devices[address]
+   
+   
 __server__ = CSGPIBBusServer()
 
 if __name__ == '__main__':
