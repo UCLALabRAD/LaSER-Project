@@ -81,9 +81,8 @@ class CSGPIBBusServer(CSPollingServer):
         
             self.name="Simulated GPIB Device at Node "+ node +", Address "+ address
             
-            self.timeout=1
             
-            self.open= lambda: self.ser.gpib_select_device(node, address,context=self.ctxt)
+            self.open= lambda: self.ser.select_device(node, address,context=self.ctxt)
 			
 			self.open()
 
@@ -91,8 +90,8 @@ class CSGPIBBusServer(CSPollingServer):
 			
 		@inlineCallbacks
         def clear(self):
-            yield self.ser.gpib_reset_output_buffer(context=self.ctxt)
-			yield self.ser.gpib_reset_input_buffer(context=self.ctxt)
+            yield self.ser.reset_output_buffer(context=self.ctxt)
+			yield self.ser.reset_input_buffer(context=self.ctxt)
 
 			
 		@inlineCallbacks
@@ -227,7 +226,7 @@ class CSGPIBBusServer(CSPollingServer):
         if n_bytes is None:
             ans = instr.read_raw()
         else:
-            ans = instr.read_raw(n_bytes)
+            ans = instr.read_bytes(n_bytes)
         ans = ans.strip().decode()
         return ans
 
@@ -259,7 +258,7 @@ class CSGPIBBusServer(CSPollingServer):
         if n_bytes is None:
             ans = instr.read_raw()
         else:
-            ans = instr.read_raw(n_bytes)
+            ans = instr.read_bytes(n_bytes)
         return bytes(ans)
 
     @setting(20, returns='*s')
@@ -305,16 +304,27 @@ class CSGPIBBusServer(CSPollingServer):
             yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
             self.HSS=None
             
-    
+    @setting(71, 'Add Simulated Device', address='s', device_type='s', socket='b',returns='')
+    def add_simulated_device(self, c, address,device_type,socket):
+	    if socket:
+		   address+="_SOCKET"
+        if self.HSS:
+            yield self.HSS.add_simulated_gpib_device(self.name,address,device_type)
         
+    @setting(72, 'Remove Simulated Device', address='s', returns='')
+    def remove_simulated_device(self, c, address):
+        if self.HSS:
+            yield self.HSS.remove_simulated_gpib_device(self.name,address)    
 
+        
+#add,remove sim device
 
     def simDeviceAdded(self, c,data):
         node, address=data
         cli=self.client
         if node==self.name:
             self.sim_devices[address]=self.GPIBDeviceConnection(self.HSS,self.name,address,self.client.context())
-   
+            self.sim_devices[address].write_termination='\n'  #set termination when adding or something of that sort
     def simDeviceRemoved(self, c, data):
         node, address=data
         if node==self.name:
