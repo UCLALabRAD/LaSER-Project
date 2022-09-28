@@ -2,8 +2,8 @@
 ### BEGIN NODE INFO
 [info]
 name = CS Script Scanner
-version = 0.9
-description =
+version = 1.1
+description = Runs scripts
 instancename = CS Script Scanner
 
 [startup]
@@ -15,21 +15,19 @@ message = 987654321
 timeout = 20
 ### END NODE INFO
 '''
-from labrad.server import setting
-from labrad.units import WithUnit
-from twisted.internet.defer import inlineCallbacks, DeferredList, returnValue
-from UCLA_CS_labrad.servers.scriptscanner.script_signals_server import CSScriptSignalsServer
-import UCLA_CS_labrad.config.scriptscanner_config as sc_config
- 
 
-#import scan_methods 
-from UCLA_CS_labrad.servers.scriptscanner.scheduler import scheduler
+from labrad.server import LabradServer, setting, Signal
+from twisted.internet.defer import inlineCallbacks, DeferredList, returnValue
+
+from scheduler import scheduler
+from experiment_classes import *
+from experiment import experiment_info
+
 import sys
-import UCLA_CS_labrad.servers.scriptscanner.experiment_info as experiment_info
-import UCLA_CS_labrad.servers.scriptscanner.single as single
-import UCLA_CS_labrad.servers.scriptscanner.repeat_reload as repeat_reload
-import UCLA_CS_labrad.servers.scriptscanner.scan_experiment_1D as scan_experiment_1D
- 
+from importlib import reload, import_module, __import__
+import UCLA_CS_labrad.config.scriptscanner_config as sc_config
+
+
 class script_class_parameters(object):
     '''
     storage class for information about the launchable script
@@ -51,58 +49,79 @@ class script_class_parameters(object):
         self.parameters = parameters
 
 
-class CSScriptScanner(CSScriptSignalsServer):
+class CSScriptScanner(LabradServer):
     """
+    Manages experiment scheduling.
     Attributes
     ----------
     scheduler: scheduler instance.
     script_parameters: dict, experiment names are keys, values are
-        script_class_parameters instances.
+                        script_class_parameters instances.
     """
 
     name = 'CS Script Scanner'
 
-    def initServer(self):
+    # SIGNALS: RUNNING SCRIPTS
+    on_running_new_script = Signal(200000, "signal_on_running_new_script", '(ws)')
+    on_running_new_status = Signal(200001, "signal_on_running_new_status", '(wsv)')
+    on_running_script_paused = Signal(200002, "signal_on_running_script_paused", 'wb')
+    on_running_script_stopped = Signal(200003, "signal_on_running_script_stopped", 'w')
+    on_running_script_finished = Signal(200005, "signal_on_running_script_finished", 'w')
+    on_running_script_finished_error = Signal(200006, "signal_on_running_script_finished_error", 'ws')
 
+    # SIGNALS: QUEUED EXPERIMENTS
+    on_queued_new_script = Signal(200010, "signal_on_queued_new_script", 'wsw')
+    on_queued_removed = Signal(200011, "signal_on_queued_removed", 'w')
+
+    # SIGNALS: SCHEDULED SCRIPTS
+    on_scheduled_new_script = Signal(200020, "signal_on_scheduled_new_script", '(wsv)')
+    on_scheduled_new_duration = Signal(200021, "signal_on_scheduled_new_duration", 'wv')
+    on_scheduled_removed = Signal(200022, "signal_on_scheduled_removed", 'w')
+
+
+    def initServer(self):
         # Dictionary with experiment.name as keys and
         # script_class_parameters instances are the values.
         self.script_parameters = {}
         # Instance of a complicated object
-        self.scheduler = scheduler(CSScriptSignalsServer)
+        self.scheduler = scheduler(self)
         self.load_scripts()
 
     def load_scripts(self):
         '''
-        loads script information from the configuration file
+        Loads script information from the configuration file.
         '''
         config = sc_config.config
         for import_path, class_name in config.scripts:
             try:
-                __import__(import_path)
+                # imports the file
+                import_module(import_path)
+                # gets the file
                 module = sys.modules[import_path]
+                # gets the experiment class from the module
                 cls = getattr(module, class_name)
             except ImportError as e:
-                print ('Script Control Error importing: ', e)
+                print('Script Control Error importing:', e)
             except AttributeError:
-                print ('There is no class {0} in module {1}'.format(class_name, module))
+                print('There is no class {0} in module {1}'.format(class_name, module))
             except SyntaxError as e:
-                print ('Incorrect syntax in file {0}'.format(import_path, class_name))
+                print(e)
+                print('Incorrect syntax in file {0}'.format(import_path, class_name))
             except Exception as e:
-                print ('There was an error in {0} : {1}'.format(class_name, e)) 
+                print('There was an error in {0} : {1}'.format(class_name, e))
             else:
                 try:
                     name = cls.name
                     parameters = cls.all_required_parameters()
                 except AttributeError:
-                    name_not_provided = 'Name is not provided for class {0} in'
-                    name_not_provided += ' module {1}'
-                    print (name_not_provided.format(class_name, module))
+                    name_not_provided = 'Name is not provided for class {0} in module {1}'
+                    print(name_not_provided.format(class_name, module))
                 else:
                     self.script_parameters[name] = script_class_parameters(name, cls, parameters)
 
     @setting(0, "get_available_scripts", returns='*s')
     def get_available_scripts(self, c):
-        return self.script_parameters.keys()
+        return list(self.script_parameters.keys())
 
     @setting(1, "get_script_parameters", script='s', returns='*(ss)')
     def get_script_parameters(self, c, script):
@@ -113,24 +132,23 @@ class CSScriptScanner(CSScriptSignalsServer):
     @setting(2, "get_running", returns='*(ws)')
     def get_running(self, c):
         '''
-        Returns the list of currently running scripts and their IDs.
+        Returns the list of currently running experiments and their IDs.
         '''
         return self.scheduler.get_running()
 
-    @setting(3, "get_scheduled", returns='*(wsv[s])')
+    @setting(3, "get_scheduled", returns='*(wsv)')
     def get_scheduled(self, c):
         '''
-        Returns the list of currently scheduled scans with their IDs and
-        durtation
+        Returns the list of currently scheduled scans with
+        their IDs and duration.
         '''
         scheduled = self.scheduler.get_scheduled()
-        scheduled = [(ident, name, WithUnit(dur,'s') ) for (ident, name, dur) in scheduled]
         return scheduled
 
     @setting(4, "get_queue", returns='*(wsw)')
     def get_queue(self, c):
         '''
-        Returns the current queue of scans in the form ID / Name / order
+        Returns the current queue of scans in the form ID / Name / order.
         '''
         return self.scheduler.get_queue()
 
@@ -141,7 +159,7 @@ class CSScriptScanner(CSScriptSignalsServer):
     @setting(6, "get_progress", script_ID='w', returns='sv')
     def get_progress(self, c, script_ID):
         '''
-        Get progress of a currently running experiment
+        Get progress of a currently running experiment.
         '''
         status = self.scheduler.get_running_status(script_ID)
         if status is None:
@@ -153,15 +171,12 @@ class CSScriptScanner(CSScriptSignalsServer):
     @setting(10, 'new_experiment', script_name='s', returns='w')
     def new_experiment(self, c, script_name):
         '''
-        Queue an experiment for launching.  Returns the scan ID of the queued
+        Queue an experiment for launching. Returns the scan ID of the queued
         experiment from a scheduler instance.
 
         Parameter
         ---------
-        script: str, experiment to run.
-
-        TODO: change name.  The name itself should actually be something
-        like add_new_experiment_to_queue
+        script_name: str, experiment to run.
 
         Returns
         -------
@@ -174,7 +189,7 @@ class CSScriptScanner(CSScriptSignalsServer):
         # required parameters for the experiment.
         script = self.script_parameters[script_name]
         # single_launch is an experiment instance.
-        single_launch = single.single(script.cls)
+        single_launch = single(script.cls)
         scan_id = self.scheduler.add_scan_to_queue(single_launch)
         return scan_id
 
@@ -184,8 +199,7 @@ class CSScriptScanner(CSScriptSignalsServer):
         if script_name not in self.script_parameters.keys():
             raise Exception("Script {} Not Found".format(script_name))
         script = self.script_parameters[script_name]
-        repeat_launch = repeat_reload(script.cls, repeat,
-                                                   save_data)
+        repeat_launch = repeat_reload(script.cls, repeat, save_data)
 
         scan_id = self.scheduler.add_scan_to_queue(repeat_launch)
         return scan_id
@@ -204,13 +218,11 @@ class CSScriptScanner(CSScriptSignalsServer):
         measure_script = self.script_parameters[measure_script_name]
         parameter = (collection, parameter_name)
         if scan_script == measure_script:
-            scan_launch = scan_experiment_1D.scan_experiment_1D(scan_script.cls,
-                                                          parameter, minim,
-                                                          maxim, steps, units)
+            scan_launch = scan_experiment_1D(scan_script.cls, parameter,
+                                             minim, maxim, steps, units)
         else:
-            scan_launch = scan_experiment_1D.scan_experiment_1D_measure(
-                scan_script.cls, measure_script.cls, parameter, minim, maxim,
-                steps, units)
+            scan_launch = scan_experiment_1D_measure(scan_script.cls, measure_script.cls,
+                                                     parameter, minim, maxim, steps, units)
         scan_id = self.scheduler.add_scan_to_queue(scan_launch)
         return scan_id
 
@@ -219,15 +231,15 @@ class CSScriptScanner(CSScriptSignalsServer):
     def new_script_schedule(self, c, script_name, duration, priority='Normal',
                             start_now=True):
         '''
-        Schedule the script to run every spcified duration of seconds.
-        Priority indicates the priority with which the scrpt is scheduled.
+        Schedule the script to run every specified duration of seconds.
+        Priority indicates the priority with which the script is scheduled.
         '''
         if script_name not in self.script_parameters.keys():
             raise Exception("Script {} Not Found".format(script_name))
         if priority not in ['Normal', 'First in Queue', 'Pause All Others']:
             raise Exception("Priority not recognized")
         script = self.script_parameters[script_name]
-        single_launch = scan_experiment_1D.single(script.cls)
+        single_launch = single(script.cls)
         schedule_id = self.scheduler.new_scheduled_scan(single_launch,
                                                         duration['s'],
                                                         priority, start_now)
@@ -238,7 +250,7 @@ class CSScriptScanner(CSScriptSignalsServer):
              duration='v[s]')
     def change_scheduled_duration(self, c, scheduled_ID, duration):
         '''
-        Change duration of the scheduled script executation
+        Change duration of the scheduled script execution
         '''
         self.scheduler.change_period_scheduled_script(scheduled_ID,
                                                       duration['s'])
@@ -275,7 +287,7 @@ class CSScriptScanner(CSScriptSignalsServer):
         through this server. The external script can then update its status, be
         paused or stopped.
         '''
-        external_scan = experiment_info.experiment_info(name)
+        external_scan = experiment_info(name)
         ident = self.scheduler.add_external_scan(external_scan)
         return ident
 
@@ -342,18 +354,18 @@ class CSScriptScanner(CSScriptSignalsServer):
 
     @setting(37, "reload_available_scripts")
     def reload_available_scripts(self, c):
-        #reload(sc_config) 
+        reload(sc_config)
         self.script_parameters = {}
         self.load_scripts()
 
     @inlineCallbacks
     def stopServer(self):
         '''
-        stop all the running scripts and exit
+        stop all running experiments and exit
         '''
         yield None
         try:
-            # cancel all scheduled scripts
+            # cancel all scheduled experiments
             for scheduled, name, loop in self.scheduler.get_scheduled():
                 self.scheduler.cancel_scheduled_script(scheduled)
             for ident, scan, priority in self.scheduler.get_queue():
@@ -369,8 +381,7 @@ class CSScriptScanner(CSScriptSignalsServer):
             # do nothing
             pass
 
+
 if __name__ == "__main__":
     from labrad import util
-    server = CSScriptScanner()
-    util.runServer(server)
-   # server.stopServer()
+    util.runServer(CSScriptScanner())

@@ -25,6 +25,11 @@ DATA_FORMAT = '%%.%dG' % PRECISION
 FILE_TIMEOUT_SEC = 60  # how long to keep datafiles open if not accessed
 DATA_TIMEOUT = 300  # how long to keep data in memory if not accessed
 DATA_URL_PREFIX = 'data:application/labrad;base64,'
+# todo: break backend up into general stuff (e.g. selfclosingfile, helper functions) and file format implementations
+# todo: note somewhere that versioning uses semantic versioning
+# todo: document versions and differences
+# todo: if artiq dataset just has 1D, create dependent variables for down
+# todo: why are certain functions defined here again, as well as in __init__?
 
 
 def time_to_str(t):
@@ -44,7 +49,7 @@ def labrad_urlencode(data):
     else:
         data_bytes, t = T.flatten(data)
         all_bytes, _ = T.flatten((str(t), data_bytes), 'ss')
-    data_url = DATA_URL_PREFIX + base64.urlsafe_b64encode(all_bytes).decode('utf-8')
+    data_url = DATA_URL_PREFIX + (base64.urlsafe_b64encode(all_bytes)).decode()
     return data_url
 
 
@@ -53,8 +58,10 @@ def labrad_urldecode(data_url):
         # decode parameter data from dataurl
         all_bytes = base64.urlsafe_b64decode(data_url[len(DATA_URL_PREFIX):])
         t, data_bytes = T.unflatten(all_bytes, 'ss')
-        data = T.unflatten(data_bytes, t)
-        return data
+        # ensure data_bytes is of type bytes
+        if type(data_bytes) == str:
+            data_bytes = data_bytes.encode()
+        return T.unflatten(data_bytes, t)
     else:
         raise ValueError("Trying to labrad_urldecode data that doesn't start "
                          "with prefix: {}".format(DATA_URL_PREFIX))
@@ -121,7 +128,7 @@ class IniData(object):
     Handles dataset metadata stored in INI files.
 
     This is used via subclassing mostly out of laziness: this was the
-    easy way to separate it from the code that messes with the acutal
+    easy way to separate it from the code that messes with the actual
     data storage so that the data storage can be modified to use HDF5
     and complex data structures.  Once the HDF5 stuff is finished,
     this can be changed to use composition rather than inheritance.
@@ -658,8 +665,7 @@ class HDF5MetaData(object):
         Parameter names in the HDF5 file are prefixed with 'Param.' to avoid
         conflicts with the other metadata.
         """
-        names = [str(k[6:]) for k in self.dataset.attrs if k.startswith('Param.')]
-        return names
+        return [str(k[6:]) for k in self.dataset.attrs if k.startswith('Param.')]
 
     def addComment(self, user, comment):
         """
@@ -731,7 +737,7 @@ class ExtendedHDF5Data(HDF5MetaData):
             else:
                 raise RuntimeError("Invalid type tag {}".format(ttag))
 
-        self.file.create_dataset('CSDataVault', (0,), dtype=dtype, maxshape=(None,))
+        self.file.create_dataset('DataVault', (0,), dtype=dtype, maxshape=(None,))
         HDF5MetaData.initialize_info(self, title, indep, dep)
 
     @property
@@ -740,7 +746,7 @@ class ExtendedHDF5Data(HDF5MetaData):
 
     @property
     def dataset(self):
-        return self.file["CSDataVault"]
+        return self.file["DataVault"]
 
     def addData(self, data):
         """
@@ -816,11 +822,10 @@ class SimpleHDF5Data(HDF5MetaData):
 
     This is a very simple implementation that only supports a single 2-D dataset
     of all floats.  HDF5 files support multiple types, multiple dimensions, and
-    a filesystem-like tree of datasets within one file.  Here, the single dataset
+    a filesystem-like tree of datasets within one file. Here, the single dataset
     is stored in /DataVault within the HDF5 file.
     """
     def __init__(self, fh):
-
         self._file = fh
         if 'Version' not in self.file.attrs:
             self.file.attrs['Version'] = np.asarray([2, 0, 0], dtype=np.int32)
@@ -829,8 +834,8 @@ class SimpleHDF5Data(HDF5MetaData):
     def initialize_info(self, title, indep, dep):
         ncol = len(indep) + len(dep)
         dtype = [('f{}'.format(idx), np.float64) for idx in range(ncol)]
-        if 'CSDataVault' not in self.file:
-            self.file.create_dataset('CSDataVault', (0,), dtype=dtype, maxshape=(None,))
+        if 'DataVault' not in self.file:
+            self.file.create_dataset('DataVault', (0,), dtype=dtype, maxshape=(None,))
         HDF5MetaData.initialize_info(self, title, indep, dep)
 
     @property
@@ -839,7 +844,7 @@ class SimpleHDF5Data(HDF5MetaData):
 
     @property
     def dataset(self):
-        return self.file["CSDataVault"]
+        return self.file["DataVault"]
 
     def addData(self, data):
         """
@@ -880,6 +885,100 @@ class SimpleHDF5Data(HDF5MetaData):
         return pos < len(self)
 
     def shape(self):
+        # todo: maybe better way of doing this? isn't cols just self.dataset.shape[1]?
+        cols = len(self.getIndependents() + self.getDependents())
+        rows = self.dataset.shape[0]
+        return (rows, cols)
+
+
+class ARTIQHDF5Data(HDF5MetaData):
+    """
+    An ARTIQ dataset backed by a HDF5 file.
+
+    This is a very barebones implementation that assumes the first column
+    of data is the independent variable, and all subsequent columns are the
+    dependent variables.
+    Independent and dependent variables have been given generic names since
+    these aren't typically specified in ARTIQs dataset management system.
+    Here, the dataset(s) are stored in /datasets within the HDF5 file.
+    For simplicity, we assume that there is only one dataset.
+    """
+    def __init__(self, fh):
+        self._file = fh
+        # get datasets
+        dataset_group = self.file["datasets"]
+        assert isinstance(dataset_group, h5py.Group)
+        # todo: figure a better way of accommodating multiple datasets
+        assert len(dataset_group) == 1
+        self.dataset_name = list(self.file["datasets"].keys())[0]
+
+        # set versioning
+        if 'Version' not in self.file.attrs:
+            self.file.attrs['Version'] = np.asarray([2, 1, 0], dtype=np.int32)
+        self.version = np.asarray(self.file.attrs['Version'], dtype=np.int32)
+
+        # create comments
+        if 'Comments' not in self.file.attrs:
+            self.dataset.attrs['Comments'] = list()
+
+    @property
+    def file(self):
+        return self._file()
+
+    @property
+    def dataset(self):
+        return self.file["datasets"][self.dataset_name]
+
+    def __len__(self):
+        return self.dataset.shape[0]
+
+    def initialize_info(self, title, indep, dep):
+        raise NotImplementedError
+
+    def addData(self, data):
+        raise NotImplementedError
+
+    def getIndependents(self):
+        """
+        todo: justify
+        """
+        prefix = 'Independent{}.'.format(1)
+        label = prefix + 'label'
+        shape = 1
+        datatype = 'v'
+        unit = 'arb.'
+        return [Independent(label, shape, datatype, unit)]
+
+    def getDependents(self):
+        rv = []
+        num_dependents = self.dataset.shape[1] - 1
+        for idx in range(num_dependents):
+            prefix = 'Dependent{}.'.format(idx)
+            label = prefix + 'label'
+            legend = prefix + 'legend'
+            shape = 1
+            datatype = 'v'
+            unit = 'arb.'
+            rv.append(Dependent(label, legend, shape, datatype, unit))
+        return rv
+
+    def getData(self, limit, start, transpose, simpleOnly):
+        """
+        Get up to <limit> rows from a dataset.
+        """
+        if transpose:
+            raise RuntimeError("Transpose specified for simple data format: not supported")
+        struct_data = self.dataset[start:] if limit is None else self.dataset[start:start + limit]
+        columns = []
+        for idx in range(len(self.getIndependents() + self.getDependents())):
+            columns.append(struct_data[:, idx])
+        data = np.column_stack(columns)
+        return data, start + data.shape[0]
+
+    def hasMore(self, pos):
+        return pos < len(self)
+
+    def shape(self):
         cols = len(self.getIndependents() + self.getDependents())
         rows = self.dataset.shape[0]
         return (rows, cols)
@@ -896,13 +995,20 @@ def open_hdf5_file(filename):
     """
     # instantiate the file
     fh = SelfClosingFile(h5py.File, open_args=(filename, 'a'))
-    version = fh().attrs['Version']
 
-    # check file for versioning then return it
-    if version[0] == 2:
-        return SimpleHDF5Data(fh)
-    else:
-        return ExtendedHDF5Data(fh)
+    # accommodate artiq files
+    if 'artiq_version' in fh().keys():
+        return ARTIQHDF5Data(fh)
+
+    # instantiate correct data object using versioning
+    try:
+        version = fh().attrs['Version']
+        if (version[0] == 2) and (version[1] == 0):
+            return SimpleHDF5Data(fh)
+        elif version[0] == 3:
+            return ExtendedHDF5Data(fh)
+    except Exception as e:
+        print('Error:', e)
 
 
 def create_backend(filename, title, indep, dep, extended):
@@ -911,10 +1017,7 @@ def create_backend(filename, title, indep, dep, extended):
     """
     hdf5_file = filename + '.hdf5'
     fh = SelfClosingFile(h5py.File, open_args=(hdf5_file, 'a'))
-    if extended:
-        data = ExtendedHDF5Data(fh)
-    else:
-        data = SimpleHDF5Data(fh)
+    data = ExtendedHDF5Data(fh) if extended else SimpleHDF5Data(fh)
     data.initialize_info(title, indep, dep)
     return data
 
@@ -929,16 +1032,16 @@ def open_backend(filename):
     """
     csv_file = filename + '.csv'
     hdf5_file = filename + '.hdf5'
+    h5_file = filename + '.h5'
 
     # check to see whether the CSV file exists
     if os.path.exists(csv_file):
-        if use_numpy:
-            return CsvNumpyData(csv_file)
-        else:
-            return CsvListData(csv_file)
+        return CsvNumpyData(csv_file)
     # check to see whether the HDF5 file exists
     elif os.path.exists(hdf5_file):
         return open_hdf5_file(hdf5_file)
+    elif os.path.exists(h5_file):
+        return open_hdf5_file(h5_file)
     # return an error if the file doesn't exist
     # (though this shouldn't happen since we check several times)
     else:

@@ -3,15 +3,22 @@ from __future__ import absolute_import
 from twisted.internet.task import LoopingCall
 from twisted.internet.defer import inlineCallbacks
 from labrad.server import LabradServer, Signal, setting
- 
+
 import numpy as np
 from . import errors
 from os import remove
+# todo: implement ability to delete things
+# todo: fix documentation
+# todo: fix up function names
+# todo: make simple if statements oneliners
 
 
 class CSDataVault(LabradServer):
-
+    """
+    Stores and manages data/datasets using the HDF5 format.
+    """
     name = 'CS Data Vault'
+
 
     # SETUP
     def __init__(self, session_store):
@@ -30,12 +37,13 @@ class CSDataVault(LabradServer):
     def initServer(self):
         # create root session
         _root = self.session_store.get([''])
-        # close all datasets on program shutdown 
-        # create loopingcall to save routinely save datasets in background
-        self.saveDatasetTimer = LoopingCall(self.saveAllDatasets)
+        # close all datasets on program shutdown
+        # create LoopingCall to save routinely save datasets in background
+        # todo: make save interval customizable
+        self.saveDatasetTimer = LoopingCall(self._saveAllDatasets)
         self.saveDatasetTimer.start(300)
 
-    def saveAllDatasets(self):
+    def _saveAllDatasets(self):
         """
         Save all datasets routinely.
         Prevents data from being corrupted due to unforeseen/uninterruptible events.
@@ -57,7 +65,7 @@ class CSDataVault(LabradServer):
             except Exception as e:
                 print(e)
 
-    def closeAllDatasets(self, signal):
+    def _closeAllDatasets(self, signal):
         """
         Close all open datasets when we shut down.
         Needed on shutdown and disconnect since open HDF5 files may become corrupted.
@@ -79,6 +87,7 @@ class CSDataVault(LabradServer):
                 datafile._fileTimeout()
             except Exception as e:
                 print(e)
+
 
     # CONTEXT MANAGEMENT
     def contextKey(self, c):
@@ -143,10 +152,15 @@ class CSDataVault(LabradServer):
         """
         Get subdirectories and datasets in the current directory.
         """
+        # todo: make oneliner
         if isinstance(tagFilters, str):
             tagFilters = [tagFilters]
+
+        # get contents of session
         sess = self.getSession(c)
         dirs, datasets = sess.listContents(tagFilters)
+
+        # parse tags
         if includeTags:
             dirs, datasets = sess.getTags(dirs, datasets)
         return dirs, datasets
@@ -165,34 +179,49 @@ class CSDataVault(LabradServer):
         is set to true, new directories will be created as needed.
         Returns the path to the new current directory.
         """
+        # empty call returns current path
         if path is None:
             return c['path']
 
-        temp = c['path'][:]  # copy the current path
+        # copy the current path
+        temp = c['path'][:]
+
+        # go up directories if path is word/int
         if isinstance(path, (int, int)):
             if path > 0:
                 temp = temp[:-path]
                 if not len(temp):
                     temp = ['']
+
+        # go down directories if path is str
         else:
             if isinstance(path, str):
                 path = [path]
+            # go down each subdirectory specified
             for segment in path:
+                # empty calls in the directory list moves us back to the root directory
                 if segment == '':
                     temp = ['']
                 else:
                     temp.append(segment)
-                if not self.session_store.exists(temp) and not create:
+                # check that subdirectory will exist
+                if (not self.session_store.exists(temp)) and (not create):
                     raise errors.DirectoryNotFoundError(temp)
-                _session = self.session_store.get(temp)  # touch the session
+                # touch the session
+                _session = self.session_store.get(temp)
+
+        # change sessions
         if c['path'] != temp:
-            # stop listening to old session and start listening to new session
+            # remove context as listener to old session
             key = self.contextKey(c)
             c['session'].listeners.remove(key)
+            # add context as listener to new session
             session = self.session_store.get(temp)
             session.listeners.add(key)
+            # store new values
             c['session'] = session
             c['path'] = temp
+
         return c['path']
 
 
@@ -202,17 +231,19 @@ class CSDataVault(LabradServer):
         """
         Make a new sub-directory in the current directory.
 
-        The current directory remains selected.  You must use the
-        'cd' command to select the newly-created directory.
-        Directory name cannot be empty.  Returns the path to the
-        created directory.
+        The current directory remains selected.
+        You must use the 'cd' command to select the newly-created directory.
+        Directory name cannot be empty.
+        Returns the path to the created directory.
         """
         if name == '':
             raise errors.EmptyNameError()
         path = c['path'] + [name]
+
         if self.session_store.exists(path):
             raise errors.DirectoryExistsError(path)
-        _sess = self.session_store.get(path)  # make the new directory
+        # create a new directory
+        _sess = self.session_store.get(path)
         return path
 
     @setting(9, name='s',
@@ -303,8 +334,9 @@ class CSDataVault(LabradServer):
         return c['path'], c['dataset']
 
     @setting(11, name=['s', 'w'], returns='b')
-    def delete_dataset(self, c, name):
+    def delete(self, c, name):
         """
+        # todo: make inclusive of folders as well as datasets
         Delete a Dataset.
 
         You can specify the dataset by name or number.
@@ -519,7 +551,7 @@ class CSDataVault(LabradServer):
 
 
     # METADATA
-    @setting(120, returns='*s')
+    @setting(120, 'Parameters', returns='*s')
     def parameters(self, c):
         """
         Get a list of parameter names.
@@ -529,7 +561,7 @@ class CSDataVault(LabradServer):
         dataset.param_listeners.add(key)  # send a message when new parameters are added
         return dataset.getParamNames()
 
-    @setting(121, 'add parameter', name='s', returns='')
+    @setting(121, name='s', returns='')
     def add_parameter(self, c, name, data):
         """
         Add a new parameter to the current dataset.
@@ -640,7 +672,7 @@ class CSDataVault(LabradServer):
         return sess.getTags(dirs, datasets)
 
 
-class CSDataVaultMultiHead(CSDataVault):
+class DataVaultMultiHead(CSDataVault):
     """
     Data Vault server with additional settings for running multi-headed.
 

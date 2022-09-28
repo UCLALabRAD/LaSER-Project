@@ -40,26 +40,34 @@ import labrad.wrappers
 
 from data_vault import SessionStore
 from data_vault.server import CSDataVault
+# todo: add support for comments
 
 
 @inlineCallbacks
 def load_settings(cxn, name):
-    """Load settings from registry with fallback to command line if needed.
+    """
+    Load settings from registry with fallback to command line if needed.
 
     Attempts to load the data vault configuration for this node from the
     registry. If not configured, we instead prompt the user to enter a path
     to use for storing data, and save this config into the registry to be
     used later.
     """
-    path = ['', 'Servers', name, 'CS Repository']
     nodename = labrad.util.getNodeName()
+
+    # get startup values from registry
+    path = ['', 'Servers', name, 'CS Repository']
     reg = cxn.registry
     yield reg.cd(path, True)
     (dirs, keys) = yield reg.dir()
+
+    # look for node-specific directory
     if nodename in keys:
         datadir = yield reg.get(nodename)
+    # otherwise, try to get default directory
     elif '__default__' in keys:
         datadir = yield reg.get('__default__')
+    # finally, have user assign starting directory
     else:
         default_datadir = os.path.expanduser('~/.labrad/vault')
         print('Could not load repository location from registry.')
@@ -78,17 +86,20 @@ def load_settings(cxn, name):
         print('To change this, edit the registry keys and restart the server.')
     returnValue(datadir)
 
+
 def main(argv=sys.argv):
     from twisted.internet import reactor
 
     @inlineCallbacks
     def start():
+        # todo: document
         opts = labrad.util.parseServerOptions(name=CSDataVault.name)
         cxn = yield labrad.wrappers.connectAsync(
             host=opts['host'], port=int(opts['port']), password=opts['password']
         )
         datadir = yield load_settings(cxn, opts['name'])
         yield cxn.disconnect()
+        # todo: document
         session_store = SessionStore(datadir, hub=None)
         server = CSDataVault(session_store)
         session_store.hub = server

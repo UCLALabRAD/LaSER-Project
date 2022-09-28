@@ -1,11 +1,35 @@
-import traceback
+"""
+Superclass of experiments and related classes.
+"""
 import labrad
+import traceback
 from treedict import TreeDict
-from .experiment_info import experiment_info 
-  
+
+class experiment_info(object):
+    '''
+    Holds informaton about the experiment
+
+    Attributes
+    ----------
+    name: str
+    parameters: TreeDict
+    required_parameters: list
+    '''
+    required_parameters = []
+    name = ''
+
+    def __init__(self, name=None, required_parameters=None):
+        if name is not None:
+            self.name = name
+        if required_parameters is not None:
+            self.required_parameters = required_parameters
+        self.parameters = TreeDict()
+
 
 class experiment(experiment_info):
-
+    """
+    Main experiment class
+    """
     def __init__(self, name=None, required_parameters=None, cxn=None,
                  min_progress=0.0, max_progress=100.0,):
         required_parameters = self.all_required_parameters()
@@ -26,14 +50,14 @@ class experiment(experiment_info):
                 error_message = error + '\n' + "Not able to connect to LabRAD"
                 raise Exception(error_message)
         try:
-            self.sc = self.cxn.servers['CS Script Scanner']
+            self.sc = self.cxn.servers['Script Scanner']
         except KeyError as error:
-            error_message = error + '\n' + "ScriptScanner is not running"
+            error_message = error + '\n' + "Script Scanner is not running"
             raise KeyError(error_message)
         try:
-            self.pv = self.cxn.servers['CS Parameter Vault']
+            self.pv = self.cxn.servers['Parameter Vault']
         except KeyError as error:
-            error_message = error + '\n' + "ParameterVault is not running"
+            error_message = error + '\n' + "Parameter Vault is not running"
             raise KeyError(error_message)
         try:
             self.context = self.cxn.context()
@@ -53,7 +77,7 @@ class experiment(experiment_info):
             self._finalize(self.cxn, self.context)
         except Exception as e:
             reason = traceback.format_exc()
-            print (reason)
+            print(reason)
             if hasattr(self, 'sc'):
                 self.sc.error_finish_confirmed(self.ident, reason)
         finally:
@@ -68,7 +92,11 @@ class experiment(experiment_info):
         self.sc.launch_confirmed(ident)
 
     def _run(self, cxn, context):
-        self.run(cxn, context)
+        try:
+            self.run(cxn, context)
+        except Exception as e:
+            print('Problem in run(): ')
+            print(e)
 
     def _load_required_parameters(self, overwrite=False):
         d = self._load_parameters_dict(self.required_parameters)
@@ -81,7 +109,7 @@ class experiment(experiment_info):
             try:
                 value = self.pv.get_parameter(collection, parameter_name)
             except Exception as e:
-                print (e)
+                print(e)
                 message = "In {}: Parameter {} not found among Parameter Vault parameters"
                 raise Exception (message.format(self.name, (collection, parameter_name)))
             else:
@@ -95,7 +123,7 @@ class experiment(experiment_info):
         '''
         if isinstance(parameter_dict, dict):
             udpate_dict = TreeDict()
-            for (collection,parameter_name), value in parameter_dict.iteritems():
+            for (collection,parameter_name), value in parameter_dict.items():
                 udpate_dict['{0}.{1}'.format(collection, parameter_name)] = value
         elif isinstance(parameter_dict, TreeDict):
             udpate_dict = parameter_dict
@@ -154,3 +182,7 @@ class experiment(experiment_info):
         '''
         implemented by the subclass
         '''
+
+
+
+

@@ -3,10 +3,13 @@ Contains the class structures needed for creating data files and directories.
 """
 import os
 import re
-import weakref
 from datetime import datetime
+from weakref import WeakValueDictionary
 
 from . import backend, errors, util
+# todo: move session/sessionstore/dataset objects into a different file
+# todo: move shared functions into util
+
 
 ## Filename translation.
 _encodings = [
@@ -21,24 +24,29 @@ _encodings = [
     ('>', '%g'),
     ('|', '%v')
 ]
+# todo: generalize file extension support
 
 
 def filename_encode(name):
-    """Encode special characters to produce a name that can be used as a filename"""
+    """
+    Encode special characters to produce a name that can be used as a filename.
+    """
     for char, code in _encodings:
         name = name.replace(char, code)
     return name
 
 
 def filename_decode(name):
-    """Decode a string that has been encoded using filename_encode"""
+    """
+    Decode a string that has been encoded using filename_encode.
+    """
     for char, code in _encodings[1:] + _encodings[0:1]:
         name = name.replace(code, char)
     return name
 
 
 def filedir(datadir, path):
-    return os.path.join(datadir, *[filename_encode(d) + '.dir' for d in path[1:]])
+    return os.path.join(datadir, *[filename_encode(d) for d in path[1:]])
 
 
 ## time formatting
@@ -90,11 +98,19 @@ class SessionStore(object):
     Handles session objects.
     Acts as main interface between server and files.
     """
+    # todo: ensure repositories can't contain one another
 
-    def __init__(self, datadir, hub):
-        self._sessions = weakref.WeakValueDictionary()
-        self.datadir = datadir
+    def __init__(self, datadirs, hub):
+        self._sessions = WeakValueDictionary()
         self.hub = hub
+
+        # todo: oneliner
+        if isinstance(datadirs, str):
+            datadirs = [datadirs]
+
+        # key = folder name, value = parent directory
+        self.datadirs = {os.path.basename(datadir): os.path.dirname(datadir) for datadir in datadirs}
+
 
     def get_all(self):
         return self._sessions.values()
@@ -106,7 +122,7 @@ class SessionStore(object):
         This does not tell us whether a session object has been
         created for that path.
         """
-        return os.path.exists(filedir(self.datadir, path))
+        return any([os.path.exists(filedir(datadir, path)) for datadir in self.datadirs.values()])
 
     def get(self, path):
         """
@@ -116,9 +132,19 @@ class SessionStore(object):
         Otherwise, create a new session instance.
         """
         path = tuple(path)
+
+        # return session if it exists
         if path in self._sessions:
             return self._sessions[path]
-        session = Session(self.datadir, path, self.hub, self)
+
+        session = None
+        # return the virtual root directory
+        if path == ('',):
+            session = VirtualSession(self.datadirs, path, self.hub, self)
+        # return the subdirectory
+        elif len(self.datadirs) > 1:
+            datadir = self.datadirs[path[1]]
+            session = Session(datadir, path, self.hub, self)
         self._sessions[path] = session
         return session
 
@@ -140,8 +166,9 @@ class Session(object):
         self.hub = hub
         self.dir = filedir(datadir, path)
         self.infofile = os.path.join(self.dir, 'session.ini')
-        self.datasets = weakref.WeakValueDictionary()
+        self.datasets = WeakValueDictionary()
 
+        # create new directory if it doesn't exist
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
 
@@ -149,6 +176,8 @@ class Session(object):
             parent_session = session_store.get(path[:-1])
             hub.onNewDir(path[-1], parent_session.listeners)
 
+        # load existing infofile (session.ini file) if it exists,
+        # otherwise create it
         if os.path.exists(self.infofile):
             self.load()
         else:
@@ -157,7 +186,8 @@ class Session(object):
             self.session_tags = {}
             self.dataset_tags = {}
 
-        self.access()  # update current access time and save
+        # update current access time and save
+        self.access()
         self.listeners = set()
 
     def load(self):
@@ -218,35 +248,54 @@ class Session(object):
         """
         Get a list of directory names in this directory.
         """
+        # get all names in the directory
         files = os.listdir(self.dir)
-        dirs = [filename_decode(s[:-4]) for s in files if s.endswith('.dir')]
-        csv_datasets = [filename_decode(s[:-4]) for s in files if s.endswith('.ini') and s.lower() != 'session.ini']
-        hdf5_datasets = [filename_decode(s[:-5]) for s in files if s.endswith('.hdf5')]
-        datasets = sorted(csv_datasets + hdf5_datasets)
 
-        # apply tag filters
+        # get directories (objects that end in '.dir' are directories, though we also allow folders that don't end in dir)
+        # todo: fix .dir suffix problem, maybe try/except block that does .dir if fails?
+        #dirs = [filename_decode(filename.split('.')[0]) for filename in files if os.path.isdir(os.path.join(self.dir, filename))]
+        dirs = [filename_decode(filename) for filename in files if os.path.isdir(os.path.join(self.dir, filename))]
+
+        # get only datasets of valid filetype
+        # todo: what about actual csv files?
+        filetype_suffixes = ('.ini', '.hdf5', '.h5')
+        def valid_filetype(filename):
+            if filename == "session.ini":
+                return False
+            else:
+                return any([filename.endswith(filetype) for filetype in filetype_suffixes])
+
+        # todo: fix bug where it splits filenames that have a period in them, otherwise reject filenames with periods in them
+        datasets = sorted([filename_decode(filename.split('.')[0]) for filename in files if valid_filetype(filename)])
+        #datasets = sorted([filename_decode(filename) for filename in files if valid_filetype(filename)])
+
+        # tag filtering functions
         def include(entries, tag, tags):
             """
             Include only entries that have the specified tag.
             """
             return [e for e in entries
-                    if e in tags and tag in tags[e]]
+                    if (e in tags) and (tag in tags[e])]
 
         def exclude(entries, tag, tags):
             """
             Exclude all entries that have the specified tag.
             """
             return [e for e in entries
-                    if e not in tags or tag not in tags[e]]
+                    if (e not in tags) or (tag not in tags[e])]
 
+        # apply tag filters
         for tag in tagFilters:
+            # choose correct filter function
             if tag[:1] == '-':
-                filter = exclude
+                filter_func = exclude
                 tag = tag[1:]
             else:
                 filter = include
-            dirs = filter(dirs, tag, self.session_tags)
-            datasets = filter(datasets, tag, self.dataset_tags)
+            # filter directories and datasets
+            dirs = filter_func(dirs, tag, self.session_tags)
+            datasets = filter_func(datasets, tag, self.dataset_tags)
+
         return sorted(dirs), sorted(datasets)
 
     def listDatasets(self):
@@ -257,7 +306,7 @@ class Session(object):
         filenames = []
         for s in files:
             base, _, ext = s.rpartition('.')
-            if ext in ['csv', 'hdf5']:
+            if ext in ['csv', 'hdf5', 'h5']:
                 filenames.append(filename_decode(base))
         return sorted(filenames)
 
@@ -292,9 +341,9 @@ class Session(object):
 
         filename = filename_encode(name)
         file_base = os.path.join(self.dir, filename)
-        if not (os.path.exists(file_base + '.csv') or os.path.exists(file_base + '.hdf5')):
+        if not (os.path.exists(file_base + '.csv') or os.path.exists(file_base + '.hdf5') or os.path.exists(file_base + '.h5')):
+        # if not all(map(os.path.exists, [file_base + suffix for suffix in ['.csv', '.hdf5', '.h5']])):
             raise errors.DatasetNotFoundError(name)
-
         if name in self.datasets:
             dataset = self.datasets[name]
             dataset.access()
@@ -351,6 +400,41 @@ class Session(object):
         sessTags = [(s, sorted(self.session_tags.get(s, []))) for s in sessions]
         dataTags = [(d, sorted(self.dataset_tags.get(d, []))) for d in datasets]
         return sessTags, dataTags
+
+
+class VirtualSession(object):
+    """
+    A session object that allows multiple directories in non-contiguous paths
+    to be treated as if they were in a single enclosing directory.
+    """
+
+    def __init__(self, datadirs, path, hub, session_store):
+        """
+        Initialization that happens once when session object is created.
+        """
+        self.path = path
+        self.hub = hub
+        self.datasets = WeakValueDictionary()
+        self.listeners = set()
+        self.subdirs = sorted(datadirs.keys())
+
+    def listContents(self, tagFilters):
+        """
+        Get a list of directory names in this directory.
+        """
+        return self.subdirs, []
+
+    def newDataset(self, title, independents, dependents, extended=False):
+        raise errors.VirtualSessionError("newDataset")
+
+    def openDataset(self, name):
+        raise errors.VirtualSessionError("openDataset")
+
+    def updateTags(self, tags, sessions, datasets):
+        raise errors.VirtualSessionError("updateTags")
+
+    def getTags(self, sessions, datasets):
+        raise errors.VirtualSessionError("getTags")
 
 
 class Dataset(object):
