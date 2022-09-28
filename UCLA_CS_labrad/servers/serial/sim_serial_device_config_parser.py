@@ -33,7 +33,7 @@ def from_string(conf, filename=None, path=None):
     else:
         version = '0.0'
 
-    return SimDeviceConfig(name, description, version,
+    return SimSerialDeviceConfig(name, description, version,
                         path, filename)
 
 

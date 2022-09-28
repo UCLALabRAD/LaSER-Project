@@ -4,7 +4,7 @@ import time
 import labrad
 import numpy as np
 from labrad.units import WithUnit as U
-from Qsim.scripts.experiments.qsimexperiment import QsimExperiment
+from UCLA_CS_labrad.scripts.experiments.qsimexperiment import QsimExperiment
 
 
 class experiment_example(QsimExperiment):
@@ -45,11 +45,13 @@ class experiment_example(QsimExperiment):
         self.p.example_parameters.
         """
         # set up experiment logistics
-        self.ident = ident                          # required for script scanner to manage different instances
+        self.ident = ident     
+        self.setup_datavault('Range', 'Amplitude')
+        # required for script scanner to manage different instances
         self.setup_grapher('experiment_example')    # tells the grapher which tab to plot the data on
 
         # set up function generator
-        self.fg_server = cxn.function_generator_server
+        self.fg_server = cxn.cs_function_generator_server
         self.fg_server.select_device(self.p.example_parameters.Function_Generator_Name)
         self.fg_server.toggle(True)
 
@@ -97,7 +99,7 @@ class experiment_example(QsimExperiment):
 if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()                  # creates LabRAD connection
-    scanner = cxn.scriptscanner             # connects to script scanner server
+    scanner = cxn.cs_script_scanner             # connects to script scanner server
     exprt = experiment_example(cxn=cxn)     # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)                    # executes the experiment

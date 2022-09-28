@@ -26,12 +26,12 @@ class experiment(experiment_info):
                 error_message = error + '\n' + "Not able to connect to LabRAD"
                 raise Exception(error_message)
         try:
-            self.sc = self.cxn.servers['CSScriptScanner']
+            self.sc = self.cxn.servers['CS Script Scanner']
         except KeyError as error:
             error_message = error + '\n' + "ScriptScanner is not running"
             raise KeyError(error_message)
         try:
-            self.pv = self.cxn.servers['CSParameterVault']
+            self.pv = self.cxn.servers['CS Parameter Vault']
         except KeyError as error:
             error_message = error + '\n' + "ParameterVault is not running"
             raise KeyError(error_message)

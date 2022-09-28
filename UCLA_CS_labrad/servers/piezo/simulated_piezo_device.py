@@ -1,10 +1,10 @@
 """
-### BEGIN SIMULATED DEVICE INFO
+### BEGIN SIMULATED SERIAL DEVICE INFO
 [info]
 name = SimulatedPiezoDevice
 version = 1.0
 description = Blah
-### END SIMULATED DEVICE INFO
+### END SIMULATED SERIAL DEVICE INFO
 """
 
 from UCLA_CS_labrad.servers.serial.hardware_simulating_server import SerialDevice

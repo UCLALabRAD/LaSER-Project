@@ -138,7 +138,7 @@ class GPIBDeviceManager(LabradServer):
         to the identification query.  If the response cannot be parsed
         or the query fails, the name will be listed as '<unknown>'.
         """
-        p = self.client.servers[server].packet()
+        p = self.client.servers[server].packet()	
         p.address(channel).timeout(Value(1, 's')).write('*CLS').write('*IDN?').read()
         print('Sending *IDN? to', server, channel)
         resp = None

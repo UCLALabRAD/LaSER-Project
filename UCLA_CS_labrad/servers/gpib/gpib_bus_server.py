@@ -52,7 +52,7 @@ from labrad.units import WithUnit
 from labrad.server import setting
 from labrad.errors import DeviceNotSelectedError
 from UCLA_CS_labrad.servers import CSPollingServer
-
+from twisted.internet.defer import returnValue, inlineCallbacks, DeferredLock
 KNOWN_DEVICE_TYPES = ('GPIB', 'TCPIP', 'USB')
 
 
@@ -65,8 +65,8 @@ class CSGPIBBusServer(CSPollingServer):
     defaultTimeout = WithUnit(1.0, 's')
     POLL_ON_STARTUP = True
 
-	
-	class GPIBDeviceConnection(object):
+    
+    class GPIBDeviceConnection(object):
         """
         Wrapper for our server's client connection to the serial server.
         @raise labrad.types.Error: Error in opening serial connection
@@ -83,64 +83,67 @@ class CSGPIBBusServer(CSPollingServer):
             
             
             self.open= lambda: self.ser.select_device(node, address,context=self.ctxt)
-			
-			self.open()
+            
+            self.open()
 
-            self.write_termination=None
-			
-		@inlineCallbacks
+            self.write_termination=''
+            
+        @inlineCallbacks
         def clear(self):
-            yield self.ser.reset_output_buffer(context=self.ctxt)
-			yield self.ser.reset_input_buffer(context=self.ctxt)
+            yield self.ser.reset_input_buffer(context=self.ctxt)
 
-			
-		@inlineCallbacks
+            
+        @inlineCallbacks
         def read_raw(self):
             resp= yield self.ser.gpib_read(context=self.ctxt)
             returnValue(resp.encode())
-			
-		@inlineCallbacks
+            
+        @inlineCallbacks
         def read_bytes(self,bytes):
             resp= yield self.ser.gpib_read(bytes,context=self.ctxt)
             returnValue(resp.encode())
-			
+            
         @inlineCallbacks
         def write(self,data):
             yield self.ser.gpib_write((data+self.write_termination),context=self.ctxt)
-	        returnValue(len(data))
-			
-			
+            returnValue(len(data))
+            
+            
         @inlineCallbacks
         def write_raw(self,data):
             yield self.ser.gpib_write(data.decode(),context=self.ctxt)
-			returnValue(len(data))
+            returnValue(len(data))
 
 
-			
+            
     def initServer(self):
         super().initServer()
         self.devices = {}
-        self.refreshPhysicalDevices()
+        self.phys_devices={}
+        self.sim_devices={}
+        self.sim_addresses=[]
+        self.refreshDevices()
 
-		
-		
+        
+        
     def _poll(self):
-        self.refreshPhysicalDevices()
+        self.refreshDevices()
 
     def refreshDevices(self):
         """
         Refresh the list of known devices on this bus.
         Currently supported are GPIB devices and GPIB over USB.
         """
-        try:
-			#check name conflicts
-			
+        try:         
             rm = visa.ResourceManager()
-            addresses = [str(x) for x in rm.list_resources()]
-			new_devices_list=addresses|self.sim_devices
-            additions = set(new_devices_list) - set(self.devices.keys())
-            deletions = set(self.devices.keys()) - set(new_devices_list)
-            for addr in additions:
+            phys_addresses=[str(x) for x in rm.list_resources()]
+            phys_additions = set(phys_addresses) - set(self.phys_devices.keys())
+            phys_deletions = set(self.phys_devices.keys()) - set(phys_addresses)
+            sim_addresses=self.sim_addresses
+            sim_additions = set(sim_addresses) - set(self.sim_devices.keys())
+            sim_deletions = set(self.sim_devices.keys()) - set(sim_addresses)
+            
+            for addr in phys_additions:
                 try:
                     if not addr.startswith(KNOWN_DEVICE_TYPES):
                         continue
@@ -149,15 +152,29 @@ class CSGPIBBusServer(CSPollingServer):
                     instr.clear()
                     if addr.endswith('SOCKET'):
                         instr.write_termination = '\n'
-                    self.devices[addr] = instr
+                    self.devices[addr] = self.phys_devices[addr]=instr
                     self.sendDeviceMessage('GPIB Device Connect', addr)
                 except Exception as e:
                     print('Failed to add ' + addr + ':' + str(e))
                     raise
-            for addr in deletions:
+            for addr in phys_deletions:
+                del self.phys_devices[addr]
                 del self.devices[addr]
                 self.sendDeviceMessage('GPIB Device Disconnect', addr)
-			
+                
+            for addr in sim_additions:
+                try:
+                    self.devices[addr]=self.sim_devices[addr]=self.GPIBDeviceConnection(self.HSS,self.name,addr,self.client.context())
+                    self.sendDeviceMessage('GPIB Device Connect', addr)
+                except Exception as e:
+                    print('Failed to add ' + addr + ':' + str(e))
+                    raise
+            for addr in sim_deletions:
+                del self.sim_devices[addr]
+                del self.devices[addr]
+                self.sendDeviceMessage('GPIB Device Disconnect', addr)
+
+            
         except Exception as e:
             print('Problem while refreshing devices:', str(e))
             raise e
@@ -203,14 +220,16 @@ class CSGPIBBusServer(CSPollingServer):
         """
         Write a string to the GPIB bus.
         """
-        self.getDevice(c).write(data)
+        print(c)
+        print(data)
+        yield self.getDevice(c).write(data)
 
     @setting(8, data='y', returns='')
     def write_raw(self, c, data):
         """
         Write a string to the GPIB bus.
         """
-        self.getDevice(c).write_raw(data)
+        yield self.getDevice(c).write_raw(data)
 
     @setting(4, n_bytes='w', returns='s')
     def read(self, c, n_bytes=None):
@@ -224,11 +243,11 @@ class CSGPIBBusServer(CSPollingServer):
         """
         instr = self.getDevice(c)
         if n_bytes is None:
-            ans = instr.read_raw()
+            ans = yield instr.read_raw()
         else:
-            ans = instr.read_bytes(n_bytes)
+            ans = yield instr.read_bytes(n_bytes)
         ans = ans.strip().decode()
-        return ans
+        returnValue(ans)
 
     @setting(5, data='s', returns='s')
     def query(self, c, data):
@@ -239,11 +258,11 @@ class CSGPIBBusServer(CSPollingServer):
         device will occur while the query is in progress.
         """
         instr = self.getDevice(c)
-        instr.write(data)
-        ans = instr.read_raw()
+        yield instr.write(data)
+        ans = yield instr.read_raw()
         # convert from bytes to string for python 3
         ans = ans.strip().decode()
-        return ans
+        returnValue(ans)
 
     @setting(7, n_bytes='w', returns='y')
     def read_raw(self, c, n_bytes=None):
@@ -256,10 +275,10 @@ class CSGPIBBusServer(CSPollingServer):
         """
         instr = self.getDevice(c)
         if n_bytes is None:
-            ans = instr.read_raw()
+            ans = yield instr.read_raw()
         else:
-            ans = instr.read_bytes(n_bytes)
-        return bytes(ans)
+            ans = yield instr.read_bytes(n_bytes)
+        returnValue(bytes(ans))
 
     @setting(20, returns='*s')
     def list_devices(self, c):
@@ -278,8 +297,8 @@ class CSGPIBBusServer(CSPollingServer):
     def _poll_fail(self, failure):
         print('Polling failed.')
 
-		
-		    # SIGNALS
+        
+            # SIGNALS
     @inlineCallbacks
     def serverConnected(self, ID, name):
         """
@@ -299,15 +318,13 @@ class CSGPIBBusServer(CSPollingServer):
     @inlineCallbacks
     def serverDisconnected(self, ID, name):
         if name=='CS Hardware Simulating Server':
-            self.sim_devices=[]
+            self.sim_addresses=[]
             yield self.HSS.removeListener(listener=self.simDeviceAdded,source = None,ID=8675311)
             yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
             self.HSS=None
             
-    @setting(71, 'Add Simulated Device', address='s', device_type='s', socket='b',returns='')
-    def add_simulated_device(self, c, address,device_type,socket):
-	    if socket:
-		   address+="_SOCKET"
+    @setting(71, 'Add Simulated Device', address='s', device_type='s',returns='')
+    def add_simulated_device(self, c, address,device_type):
         if self.HSS:
             yield self.HSS.add_simulated_gpib_device(self.name,address,device_type)
         
@@ -316,19 +333,17 @@ class CSGPIBBusServer(CSPollingServer):
         if self.HSS:
             yield self.HSS.remove_simulated_gpib_device(self.name,address)    
 
-        
-#add,remove sim device
 
     def simDeviceAdded(self, c,data):
         node, address=data
         cli=self.client
         if node==self.name:
-            self.sim_devices[address]=self.GPIBDeviceConnection(self.HSS,self.name,address,self.client.context())
-            self.sim_devices[address].write_termination='\n'  #set termination when adding or something of that sort
+            self.sim_addresses.append(address)
+            
     def simDeviceRemoved(self, c, data):
         node, address=data
         if node==self.name:
-            del self.sim_devices[address]
+            self.sim_addresses.remove(address)
    
    
 __server__ = CSGPIBBusServer()

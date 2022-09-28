@@ -1,4 +1,4 @@
-import UCLA_CS_labrad.servers.script_scanner.experiment as experiment
+import UCLA_CS_labrad.servers.scriptscanner.experiment as experiment
 import numpy as np
 import time
 
@@ -48,17 +48,17 @@ class QsimExperiment(experiment.experiment):
         #     error_message = error + '\n' + "Pulser is not running"
         #     raise KeyError(error_message)
 
-        # try:
-        #     self.grapher = self.cxn.servers['grapher']
-        # except KeyError as error:
-        #     error_message = error + '\n' + "Grapher is not running"
-        #     raise KeyError(error_message)
+        try:
+             self.grapher = self.cxn.servers['grapher']
+        except KeyError as error:
+             error_message = error + '\n' + "Grapher is not running"
+             raise KeyError(error_message)
 
-        #try:
-        #    self.timeharp = self.cxn.servers['timeharpserver']
-        #except KeyError as error:
-        #    error_message = str(error) + '\n' + "TimeHarp is not running"
-        #    raise KeyError(error_message)
+        try:
+            self.timeharp = self.cxn.servers['timeharpserver']
+        except KeyError as error:
+            error_message = str(error) + '\n' + "TimeHarp is not running"
+            raise KeyError(error_message)
 
     def setup_datavault(self, x_axis, y_axis):
 

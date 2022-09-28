@@ -64,7 +64,7 @@ class SerialDevice(object):
     actual_dtr=None
     actual_rst=None
     
-	command_dict=None
+    command_dict=None
         
     def __init__(self):
         self.output_buffer=bytearray(b'')
@@ -78,60 +78,64 @@ class SerialDevice(object):
             pass
         else:
             return self.command_dict[(cmd,len(args))](*args)
-			
+            
 class GPIBDevice(object):
 
-	termination_character=''
+    termination_character=''
     command_dict=None
-	id_command="*IDN?"
-	id_string=None
-	supports_command_chaining=False
-	supports_any_prefix=False
+    id_command="*IDN?"
+    id_string=None
+    supports_command_chaining=True
+    supports_any_prefix=False
     def __init__(self):
-        self.output_buffer=bytearray(b'')
         self.input_buffer=bytearray(b'')
    
     def interpret_serial_command(self, cmd):
-		if cmd==self.id_command:
-		        return self.address
-        for cmd_specs, func in self.command_dict:
-		    if (is_valid_cmd(cmd,cmd_specs)):
-			    resp=func(*args)
-			    if resp:
-				    return resp+=self.termination_character
-				else:
-				    return None
-			    
-	    
-		
-		
-	def is_valid_cmd(self,cmd,cmd_format):
-	    cmd,*args=cmd.split(' ')
-	    cmd_format,num_args, query_option=cmd_format
-		if not (len(args)==num_args or (query_option and len(args)==0)):
-		    return False
-		if (query_option and cmd_format[-1]=='?'):
-		    cmd_format=cmd_format[:-1]
-	    if not (cmd.toLower()==cmd or cmd.toUpper()==cmd):
-		    return False
-	    cmd=cmd.toLower()
-		cmd_chunks_list=cmd.split(':')
-		cmd_format_chunks_list=cmd_format.split(':')
-		if len(cmd_chunks_list)!=len(cmd_format_chunks_list):
-		    return False
-		for cmd_chunk,cmd_format_chunk in cmd_format_chunks_list,:
-	        prefix=str([char for char in cmd_format_chunk if char.isUpper()])
-			prefix=prefix.toLower()
-			cmd_format_chunk=cmd_format_chunk.toLower()
-            if supports_any_prefix:
-			    if not (cmd_chunk.startswith(prefix) and cmd_format_chunk.startswith(cmd_chunk)):
-				   return False
-			else:
-			    if not (cmd_chunk==prefix or cmd_chunk==cmd_format_chunk):
-				   return False
-		return True
-		
-	    
+        print("hithere")
+        print(cmd)
+        print(self.id_command)
+        if cmd==self.id_command:
+                return self.id_string
+        for cmd_specs, func in self.command_dict.items():
+            if (self.is_valid_cmd(cmd,cmd_specs)):
+                _,*args=cmd.split(" ")
+                resp=func(*args)
+                if resp:
+                    return resp
+                else:
+                    return ""
+        return None
+                
+        
+        
+        
+    def is_valid_cmd(self,cmd,cmd_format):
+        cmd,*args=cmd.split(' ')
+        cmd_format,num_args, query_option=cmd_format
+        if not (len(args)==num_args or (query_option and len(args)==0)):
+            return False
+        if (query_option and cmd[-1]=='?'):
+            cmd=cmd[:-1]
+        if not (cmd.lower()==cmd or cmd.upper()==cmd):
+            return False
+        cmd=cmd.lower()
+        cmd_chunks_list=cmd.split(':')
+        cmd_format_chunks_list=cmd_format.split(':')
+        if len(cmd_chunks_list)!=len(cmd_format_chunks_list):
+            return False
+        for cmd_chunk,cmd_format_chunk in zip(cmd_chunks_list, cmd_format_chunks_list):
+            prefix="".join([char for char in cmd_format_chunk if char.isupper()])
+            prefix=prefix.lower()
+            cmd_format_chunk=cmd_format_chunk.lower()
+            if self.supports_any_prefix:
+                if not (cmd_chunk.startswith(prefix) and cmd_format_chunk.startswith(cmd_chunk)):
+                   return False
+            else:
+                if not (cmd_chunk==prefix or cmd_chunk==cmd_format_chunk):
+                   return False
+        return True
+        
+        
 # DEVICE CLASS
 class CSHardwareSimulatingServer(LabradServer):
     name='CS Hardware Simulating Server'
@@ -146,22 +150,21 @@ class CSHardwareSimulatingServer(LabradServer):
     def initServer(self):
         super().initServer()
         self.devices={}
-		self.serial_device_configs={}
-		self.gpib_device_configs={}
+        self.serial_device_configs={}
+        self.gpib_device_configs={}
         try:
             self.HSS_serial_config_dirs=yield self._getSimSerialDeviceDirectories(self.registryDirectory)
-			self.HSS_GPIB_config_dirs=yield self._getSimGPIBDeviceDirectories(self.registryDirectory)
+            print(self.HSS_serial_config_dirs)
+            self.HSS_GPIB_config_dirs=yield self._getSimGPIBDeviceDirectories(self.registryDirectory)
             if not ((self.HSS_serial_config_dirs and len(self.HSS_serial_config_dirs)>0) or (self.HSS_GPIB_config_dirs and len(self.HSS_GPIB_config_dirs)>0)):
                 raise Error()
         except:
             raise HSSError(3)
-        try:
-            self.refreshSerialDeviceTypes()
-			self.refreshGPIBDeviceTypes()
-            if len(self.serial_device_configs)==0 and len(self.gpib_device_configs)==0:
-                raise Error()
-        except:
-            raise HSSError(4)
+        self.refreshSerialDeviceTypes()
+        self.refreshGPIBDeviceTypes()
+        if len(self.serial_device_configs)==0 and len(self.gpib_device_configs)==0:
+            raise Error()
+            pass
 
     def initContext(self,c):
         c['Device']=None
@@ -217,8 +220,8 @@ class CSHardwareSimulatingServer(LabradServer):
 
             for d in devices:
                 device_configs[d.name] = d
-				
-			self.serial_device_configs.update(device_configs)
+                
+            self.serial_device_configs.update(device_configs)
     def refreshGPIBDeviceTypes(self):
         """Refresh the list of available servers."""
         # configs is a nested map from name to version to list of classes.
@@ -228,7 +231,7 @@ class CSHardwareSimulatingServer(LabradServer):
         # for the same version.
         configs = {}
         # look for .ini files
-        for dirname in self.HSS_config_dirs:
+        for dirname in self.HSS_GPIB_config_dirs:
             for path, dirs, files in os.walk(dirname):
                 if '.simdeviceignore' in files:
                     del dirs[:] # clear dirs list so we don't visit subdirs
@@ -238,10 +241,10 @@ class CSHardwareSimulatingServer(LabradServer):
                     if ext.lower() != ".py":
                         continue
                     else:
-                        conf = sim_device_config_parser.find_config_block(path, f)
+                        conf = sim_gpib_device_config_parser.find_config_block(path, f)
                         if conf is None:
                             continue
-                    config = sim_device_config_parser.from_string(conf, f, path)
+                    config = sim_gpib_device_config_parser.from_string(conf, f, path)
                     versions = configs.setdefault(config.name, {})
                     versions.setdefault(config.version, []).append(config)
            
@@ -269,10 +272,10 @@ class CSHardwareSimulatingServer(LabradServer):
 
             for d in devices:
                 device_configs[d.name] = d
-				
-			self.gpib_device_configs.update(device_configs)
-			
-			
+                
+            self.gpib_device_configs.update(device_configs)
+            
+            
     def _relayMessage(self, signal, **kw):
         """Send messages out to LabRAD."""
         kw['node'] = self.name
@@ -318,7 +321,7 @@ class CSHardwareSimulatingServer(LabradServer):
             raise HSSError(1)
         active_device=c['Device']
         if not count:
-		   count=len(active_device.input_buffer)
+           count=len(active_device.input_buffer)
         write_out,rest=active_device.input_buffer[:count],active_device.input_buffer[count:]
         active_device.input_buffer=rest
         return write_out.decode()
@@ -327,14 +330,26 @@ class CSHardwareSimulatingServer(LabradServer):
     def gpib_write(self,c,data):
         if not c['Device']:
             raise HSSError(1)
+        self.reset_input_buffer(c)
+        if data=='*CLS':
+            pass
         active_device=c['Device']
-        active_device.output_buffer.extend(data.encode())
-        *cmds, rest=active_device.output_buffer.decode().split(active_device.termination_character)
-        for cmd in cmds:
-            command_interpretation=active_device.interpret_serial_command(cmd)
-            active_device.input_buffer.extend(command_interpretation.encode())
-                
-        active_device.output_buffer=bytearray(rest.encode())
+        invalid_command_entered=False
+        if active_device.supports_command_chaining:
+            cmds=data.split(';')
+            for cmd in cmds:
+               command_interpretation=active_device.interpret_serial_command(cmd)
+               if command_interpretation or command_interpretation=="":
+                   active_device.input_buffer.extend((command_interpretation+';').encode())
+               else:
+                   invalid_command_entered=True
+                   break
+        if active_device.input_buffer:
+            active_device.input_buffer=active_device.input_buffer[:-1]
+            if not invalid_command_entered:
+                active_device.input_buffer.extend(active_device.termination_character)
+            
+        
     
     @setting(31, 'Add Simulated Serial Device', node='s',port='s', device_type='s',returns='')
     def add_serial_device(self, c, node, port,device_type):
@@ -375,11 +390,9 @@ class CSHardwareSimulatingServer(LabradServer):
         spec = importlib.util.spec_from_file_location(self.gpib_device_configs[device_type].module_name,self.gpib_device_configs[device_type].module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module) #possible safety issue- shouldnt have to run ANYTHING
-        try:
-            DevClass=getattr(module,device_type)
-            self.devices[(node,port)]=DevClass()
-        except:
-            raise HSSError(5)
+        DevClass=getattr(module,device_type)
+        print(DevClass)
+        self.devices[(node,address)]=DevClass()
         self.gpib_device_added((node,address))
         
         
@@ -518,11 +531,11 @@ class CSHardwareSimulatingServer(LabradServer):
         """
         # get everything in the given directory
         yield self.client.registry.cd(path)
-		yield self.client.registry.cd('Serial')
+        yield self.client.registry.cd('Serial')
         _, keys = yield self.client.registry.dir()
         dirs= yield self.client.registry.get('directories')
         returnValue(dirs)
-		
+        
     @inlineCallbacks
     def _getSimGPIBDeviceDirectories(self, path):
         """
@@ -534,12 +547,12 @@ class CSHardwareSimulatingServer(LabradServer):
         """
         # get everything in the given directory
         yield self.client.registry.cd(path)
-		yield self.client.registry.cd('GPIB')
+        yield self.client.registry.cd('GPIB')
         _, keys = yield self.client.registry.dir()
         dirs= yield self.client.registry.get('directories')
         returnValue(dirs)
-		
-		
+        
+        
     @inlineCallbacks
     def serverConnected(self, ID, name):
         """
@@ -547,16 +560,16 @@ class CSHardwareSimulatingServer(LabradServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-		
+        
         if name.endswith('GPIB Bus Server'):
-		    for node, port in self.devices.keys():
-			    if name.startswith(node) and isinstance(self.devices[(node,port)],SimulatedGPIBDevice):
-				    self.gpib_device_added((node,address))
-		elif name.endswith('Serial Bus Server'):
-		    for node, port in self.devices.keys():
-			    if name.startswith(node) and isinstance(self.devices[(node,port)],SimulatedSerialDevice):
-				    self.serial_device_added((node,address))
-		
+            for node, port in self.devices.keys():
+                if name.startswith(node) and isinstance(self.devices[(node,port)],SimulatedGPIBDevice):
+                    self.gpib_device_added((node,address))
+        elif name.endswith('Serial Bus Server'):
+            for node, port in self.devices.keys():
+                if name.startswith(node) and isinstance(self.devices[(node,port)],SimulatedSerialDevice):
+                    self.serial_device_added((node,address))
+        
         
        
 
