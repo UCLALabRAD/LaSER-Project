@@ -220,8 +220,6 @@ class CSGPIBBusServer(CSPollingServer):
         """
         Write a string to the GPIB bus.
         """
-        print(c)
-        print(data)
         yield self.getDevice(c).write(data)
 
     @setting(8, data='y', returns='')

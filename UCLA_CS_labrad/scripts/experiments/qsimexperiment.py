@@ -19,7 +19,6 @@ class QsimExperiment(experiment.experiment):
             self.name = self.__class__.__name__
         else: 
             self.name = name
-
         self.p = self.parameters
         self.cxn = cxn
         self.pv = None
@@ -39,8 +38,8 @@ class QsimExperiment(experiment.experiment):
         '''
         Adds parameters to datavault and parameter vault
         '''
-
         self.dv.cd(['', self.name], True)
+        print("yoooo")
         self.dataset = self.dv.new(self.name, [(x_axis, 'num')],
                                    [(y_axis, '', 'num')])
 

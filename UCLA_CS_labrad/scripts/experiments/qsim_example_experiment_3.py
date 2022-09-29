@@ -7,9 +7,9 @@ from labrad.units import WithUnit as U
 from UCLA_CS_labrad.scripts.experiments.qsimexperiment import QsimExperiment
 
 
-class experiment_example(QsimExperiment):
+class cs_example_experiment_3(QsimExperiment):
 
-    name = 'Example Experiment'  # gives a name to display on scriptscanner
+    name = 'cs_example_experiment_3'  # gives a name to display on scriptscanner
 
     """
     This experiment_example inherits from the QsimExperiment Class which in
@@ -99,6 +99,6 @@ if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()                  # creates LabRAD connection
     scanner = cxn.cs_script_scanner             # connects to script scanner server
-    exprt = experiment_example(cxn=cxn)     # instantiates the experiment
+    exprt = cs_example_experiment_3(cxn=cxn)     # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)                    # executes the experiment
