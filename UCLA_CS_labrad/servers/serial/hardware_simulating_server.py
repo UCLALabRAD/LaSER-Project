@@ -441,10 +441,12 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(61, 'Select Device', node='s', port='s', returns='')
     def select_device(self,c,node,port):
         c['Device']=self.devices[(node,port)]
+
       
     @setting(62, 'Deselect Device',returns='')
     def deselect_device(self,c,node):    
         c['Device']=None
+
 
     @setting(71, 'Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
     def baudrate(self,c,val):
@@ -560,15 +562,14 @@ class CSHardwareSimulatingServer(LabradServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-        
         if name.endswith('GPIB Bus Server'):
             for node, port in self.devices.keys():
-                if name.startswith(node) and isinstance(self.devices[(node,port)],SimulatedGPIBDevice):
-                    self.gpib_device_added((node,address))
-        elif name.endswith('Serial Bus Server'):
+                if name==node and not hasattr(self.devices[(node,port)],"required_baudrate"):
+                    self.gpib_device_added((node,port))
+        elif name.endswith('Serial Server'):
             for node, port in self.devices.keys():
-                if name.startswith(node) and isinstance(self.devices[(node,port)],SimulatedSerialDevice):
-                    self.serial_device_added((node,address))
+                if name==node and hasattr(self.devices[(node,port)],"required_baudrate"):
+                    self.serial_device_added((node,port))
         
         
        

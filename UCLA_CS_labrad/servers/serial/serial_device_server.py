@@ -165,8 +165,8 @@ class CSSerialDeviceServer(LabradServer):
     # node parameters
     name = 'CSSerialDevice'
     reg_key = None
-    default_port ='cu.usbserial-AM00QYUP'
-    default_node = 'landons-macbook-pro.local'
+    default_port = None #'cu.usbserial-AM00QYUP'
+    default_node = None #'landons-macbook-pro.local'
     
     
 
@@ -254,12 +254,14 @@ class CSSerialDeviceServer(LabradServer):
         super().stopServer()
         for conn in self.serial_connection_dict.values():
             yield conn.acquire()
-            conn.close()
-            conn.release()
+            try:
+                conn.close()
+            finally:
+                conn.release()
             
     def initContext(self,c):
         for node,port in self.serial_connection_dict:
-           if self._matchSerial(self.default_node,node) and port==self.default_port:
+           if self.default_node and self.default_port and self._matchSerial(self.default_node,node) and port==self.default_port:
                c['Serial Connection']= self.serial_connection_dict[(node,port)]
                c['Serial Node']=node
                c['Serial Port']=port
@@ -381,7 +383,7 @@ class CSSerialDeviceServer(LabradServer):
             if bus_server == name:
                 print('Serial bus server '+name+' disconnected. Relaunch the serial server')
                 for context_obj in self.contexts.values():
-                    if context_obj.data['Serial Connection'] and context_obj.data['Serial Node']==name:
+                    if 'Serial Connection' in context_obj.data and context_obj.data['Serial Connection'] and context_obj.data['Serial Node']==name:
                         context_obj.data['Serial Connection']=None
                         context_obj.data['Serial Port'] = None
                         context_obj.data['Serial Node'] = None
@@ -472,14 +474,16 @@ class CSSerialDeviceServer(LabradServer):
                     (str)   : the device response (stripped of EOL characters)
         """
         yield c['Serial Connection'].acquire()
-        yield c['Serial Connection'].write(data)
-        if stop is None:
-            resp = yield c['Serial Connection'].read()
-        elif type(stop) == int:
-            resp = yield c['Serial Connection'].read(stop)
-        elif type(stop) == str:
-            resp = yield c['Serial Connection'].read_line(stop)
-        c['Serial Connection'].release()
+        try:
+            yield c['Serial Connection'].write(data)
+            if stop is None:
+                resp = yield c['Serial Connection'].read()
+            elif type(stop) == int:
+                resp = yield c['Serial Connection'].read(stop)
+            elif type(stop) == str:
+                resp = yield c['Serial Connection'].read_line(stop)
+        finally:
+            c['Serial Connection'].release()
         returnValue(resp)
 
     @setting(222224, 'Serial Write', data='s', returns='')
@@ -490,8 +494,10 @@ class CSSerialDeviceServer(LabradServer):
             data    (str)   : the data to write to the device
         """
         yield c['Serial Connection'].acquire()
-        yield c['Serial Connection'].write(data)
-        c['Serial Connection'].release()
+        try:
+            yield c['Serial Connection'].write(data)
+        finally:
+            c['Serial Connection'].release()
 
     @setting(222225, 'Serial Read', stop=['i: read a given number of characters',
                                           's: read until the given character'], returns='s')
@@ -502,13 +508,15 @@ class CSSerialDeviceServer(LabradServer):
                     (str)   : the device response (stripped of EOL characters)
         """
         yield c['Serial Connection'].acquire()
-        if stop is None:
-            resp = yield c['Serial Connection'].read()
-        elif type(stop) == int:
-            resp = yield c['Serial Connection'].read(stop)
-        elif type(stop) == str:
-            resp = yield c['Serial Connection'].read_line(stop)
-        c['Serial Connection'].release()
+        try:
+            if stop is None:
+                resp = yield c['Serial Connection'].read()
+            elif type(stop) == int:
+                resp = yield c['Serial Connection'].read(stop)
+            elif type(stop) == str:
+                resp = yield c['Serial Connection'].read_line(stop)
+        finally:
+            c['Serial Connection'].release()
         returnValue(resp)
 
 
@@ -519,14 +527,8 @@ class CSSerialDeviceServer(LabradServer):
         Flush the serial input and output buffers.
         """
         yield c['Serial Connection'].acquire()
-        yield c['Serial Connection'].flush_input()
-        yield c['Serial Connection'].flush_output()
-        c['Serial Connection'].release()
-
-    @setting(222232, 'Serial Release', returns='')
-    def serial_release(self, c):
-        """
-        Try to release the serial comm lock in case
-        we have a problem.
-        """
-        c['Serial Connection'].release()
+        try:
+            yield c['Serial Connection'].flush_input()
+            yield c['Serial Connection'].flush_output()
+        finally:
+            c['Serial Connection'].release()
