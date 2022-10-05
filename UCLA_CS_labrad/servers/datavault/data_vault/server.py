@@ -4,6 +4,7 @@ from twisted.internet.task import LoopingCall
 from twisted.internet.defer import inlineCallbacks
 from labrad.server import LabradServer, Signal, setting
 
+
 import numpy as np
 from . import errors
 from os import remove
@@ -38,6 +39,7 @@ class CSDataVault(LabradServer):
         # create root session
         _root = self.session_store.get([''])
         # close all datasets on program shutdown
+        #win32api.SetConsoleCtrlHandler(self._closeAllDatasets, True)
         # create LoopingCall to save routinely save datasets in background
         # todo: make save interval customizable
         self.saveDatasetTimer = LoopingCall(self._saveAllDatasets)
@@ -152,9 +154,8 @@ class CSDataVault(LabradServer):
         """
         Get subdirectories and datasets in the current directory.
         """
-        # todo: make oneliner
-        if isinstance(tagFilters, str):
-            tagFilters = [tagFilters]
+        # ensure tagFilters is a list object
+        tagFilters = [tagFilters] if isinstance(tagFilters, str) else tagFilters
 
         # get contents of session
         sess = self.getSession(c)
@@ -229,7 +230,7 @@ class CSDataVault(LabradServer):
     @setting(8, name='s', returns='*s')
     def mkdir(self, c, name):
         """
-        Make a new sub-directory in the current directory.
+        Make a new subdirectory in the current directory.
 
         The current directory remains selected.
         You must use the 'cd' command to select the newly-created directory.
@@ -243,6 +244,7 @@ class CSDataVault(LabradServer):
         if self.session_store.exists(path):
             raise errors.DirectoryExistsError(path)
         # create a new directory
+        print(path)
         _sess = self.session_store.get(path)
         return path
 
@@ -263,6 +265,10 @@ class CSDataVault(LabradServer):
         a legend entry that should be unique for each trace.
         Returns the path and name for this dataset.
         """
+        # ensure valid filename
+        if "." in name:
+            raise Exception("Error: invalid title (contains periods).")
+
         session = self.getSession(c)
         dataset = session.newDataset(name or 'untitled', independents, dependents)
         c['dataset'] = dataset.name  # not the same as name; has number prefixed
@@ -304,6 +310,10 @@ class CSDataVault(LabradServer):
 
         The legacy format requires each column be a scalar v[unit] type.
         """
+        # ensure valid filename
+        if "." in name:
+            raise Exception("Error: invalid title (contains periods).")
+
         session = self.getSession(c)
         dataset = session.newDataset(name, independents, dependents, extended=True)
         c['dataset'] = dataset.name  # not the same as name; has number prefixed
@@ -672,7 +682,7 @@ class CSDataVault(LabradServer):
         return sess.getTags(dirs, datasets)
 
 
-class DataVaultMultiHead(CSDataVault):
+class CSDataVaultMultiHead(CSDataVault):
     """
     Data Vault server with additional settings for running multi-headed.
 
@@ -780,3 +790,5 @@ class ExtendedContext(object):
 
     def __hash__(self):
         return hash(self.context) ^ hash(self.server.host) ^ self.server.port
+
+

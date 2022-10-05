@@ -66,15 +66,16 @@ class CSParameterVault(LabradServer):
     def _get_parameter_names(self, collection):
         names = []
         for key in self.parameters.keys():
-            if key[0] == collection:
-                names.append(key[1])
+            if list(key[:len(collection)]) == collection: #should this only require prefix or whole path? Another possibility: include all parameters below with . notation (relative to collection)- definitely necessary to deal with duplicates
+                names.append('.'.join(key[len(collection):]))
         return names
 
-    def _get_collections(self):
+    def _get_collections(self): #should this only require prefix or whole path? probably prefix (
         names = set()
         for key in self.parameters.keys():
-            names.add(key[0])
-        return list(names)
+            for i in range(len(key)-1):
+                names.add(tuple(key[:i+1]))
+        return [list(name) for name in names]
 
     @inlineCallbacks
     def save_parameters(self):
@@ -148,12 +149,14 @@ class CSParameterVault(LabradServer):
         else:  # parameter type not known
             return value
 
-    @setting(0, "Set Parameter", collection='s', parameter_name='s', value='?',
+    @setting(0, "Set Parameter", collection=['s','*s'], parameter_name='s', value='?',
              full_info='b', returns='')
     def setParameter(self, c, collection, parameter_name, value,
                      full_info=False):
         """Set Parameter"""
-        key = (collection, parameter_name)
+        if isinstance(collection,str):
+            collection=[collection]
+        key = (*collection, *parameter_name.split('.'))
         if key not in self.parameters.keys():
             raise Exception(str(key) + " Parameter Not Found")
         if full_info:
@@ -163,11 +166,13 @@ class CSParameterVault(LabradServer):
         notified = self.getOtherListeners(c)
         self.onParameterChange((key[0], key[1]), notified)
 
-    @setting(1, "Get Parameter", collection='s', parameter_name='s',
+    @setting(1, "Get Parameter", collection=['s','*s'], parameter_name='s',
              checked='b', returns=['?'])
     def getParameter(self, c, collection, parameter_name, checked=True):
         """Get Parameter Value"""
-        key = (collection, parameter_name)
+        if isinstance(collection,str):
+            collection=[collection]
+        key = (*collection, *parameter_name.split('.'))
         if key not in self.parameters.keys():
             raise Exception(str(key) + "  Parameter Not Found")
         value = self.parameters[key]
@@ -175,9 +180,11 @@ class CSParameterVault(LabradServer):
             value = self._check_parameter(key, value)
         return value
 
-    @setting(2, "Get Parameter Names", collection='s', returns='*s')
+    @setting(2, "Get Parameter Names", collection=['s','*s'], returns='*s')
     def getParameterNames(self, c, collection):
         """Get Parameter Names"""
+        if isinstance(collection,str):
+            collection=[collection]
         parameter_names = self._get_parameter_names(collection)
         return parameter_names
 
@@ -186,7 +193,7 @@ class CSParameterVault(LabradServer):
         """Get Experiment Parameter Names"""
         yield self.save_parameters()
 
-    @setting(4, "Get Collections", returns='*s')
+    @setting(4, "Get Collections", returns='**s')
     def get_collection_names(self, c):
         collections = self._get_collections()
         return collections
