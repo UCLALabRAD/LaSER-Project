@@ -91,9 +91,6 @@ class GPIBDevice(object):
         self.input_buffer=bytearray(b'')
    
     def interpret_serial_command(self, cmd):
-        print("hithere")
-        print(cmd)
-        print(self.id_command)
         if cmd==self.id_command:
                 return self.id_string
         for cmd_specs, func in self.command_dict.items():
@@ -154,7 +151,6 @@ class CSHardwareSimulatingServer(LabradServer):
         self.gpib_device_configs={}
         try:
             self.HSS_serial_config_dirs=yield self._getSimSerialDeviceDirectories(self.registryDirectory)
-            print(self.HSS_serial_config_dirs)
             self.HSS_GPIB_config_dirs=yield self._getSimGPIBDeviceDirectories(self.registryDirectory)
             if not ((self.HSS_serial_config_dirs and len(self.HSS_serial_config_dirs)>0) or (self.HSS_GPIB_config_dirs and len(self.HSS_GPIB_config_dirs)>0)):
                 raise Error()
@@ -391,7 +387,6 @@ class CSHardwareSimulatingServer(LabradServer):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module) #possible safety issue- shouldnt have to run ANYTHING
         DevClass=getattr(module,device_type)
-        print(DevClass)
         self.devices[(node,address)]=DevClass()
         self.gpib_device_added((node,address))
         
@@ -562,7 +557,7 @@ class CSHardwareSimulatingServer(LabradServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-        if name.endswith('GPIB Bus Server'):
+        if name.endswith('GPIB Bus'):
             for node, port in self.devices.keys():
                 if name==node and not hasattr(self.devices[(node,port)],"required_baudrate"):
                     self.gpib_device_added((node,port))

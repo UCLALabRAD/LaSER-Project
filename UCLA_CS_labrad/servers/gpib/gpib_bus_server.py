@@ -115,13 +115,22 @@ class CSGPIBBusServer(CSPollingServer):
             returnValue(len(data))
 
 
-            
+    @inlineCallbacks        
     def initServer(self):
         super().initServer()
         self.devices = {}
         self.phys_devices={}
         self.sim_devices={}
         self.sim_addresses=[]
+        self.HSS=None
+        servers=yield self.client.manager.servers()
+        if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
+            yield self.client.refresh()
+            self.HSS=self.client.servers['CS Hardware Simulating Server']
+            yield self.HSS.signal__simulated_gpib_device_added(8675311)
+            yield self.HSS.signal__simulated_gpib_device_removed(8675312)
+            yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675311)
+            yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
         self.refreshDevices()
 
         

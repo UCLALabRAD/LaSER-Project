@@ -39,7 +39,6 @@ class QsimExperiment(experiment.experiment):
         Adds parameters to datavault and parameter vault
         '''
         self.dv.cd(['', self.name], True)
-        print("yoooo")
         self.dataset = self.dv.new(self.name, [(x_axis, 'num')],
                                    [(y_axis, '', 'num')])
 

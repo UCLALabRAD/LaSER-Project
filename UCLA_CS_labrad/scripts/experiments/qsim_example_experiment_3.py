@@ -59,7 +59,7 @@ class cs_example_experiment_3(QsimExperiment):
         self.fg_server.amplitude(self.p.example_parameters.Amplitude)
 
     def run(self, cxn, context):
-        """
+        """ #penny CS GPIB Bus - USB0::0x0957::0x1507::MY48007979::INSTR
         Here is where you write your experiment using the parameters imported
         to affect equipment that you connected to in initialize.
 
