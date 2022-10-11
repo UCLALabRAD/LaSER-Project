@@ -17,9 +17,8 @@ from UCLA_CS_labrad.servers.serial import serial_device_server
 from UCLA_CS_labrad.servers.serial.serial_device_server import *
 __all__.extend(serial_device_server.__all__)
 
-from UCLA_CS_labrad.servers.serial import hardware_simulating_server
-from UCLA_CS_labrad.servers.serial.hardware_simulating_server import *
-__all__.extend(hardware_simulating_server.__all__)
+from UCLA_CS_labrad.servers.hardwaresimulation import hardware_simulating_server
+
 
 # convenience servers
 from UCLA_CS_labrad.servers import server_classes

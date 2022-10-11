@@ -1,20 +1,12 @@
-"""
-### BEGIN SIMULATED GPIB DEVICE INFO
-[info]
-name = SimulatedAgilent33210ADevice
-version = 1.0
-description = Blah
-### END SIMULATED GPIB DEVICE INFO
-"""
 
-from UCLA_CS_labrad.servers.serial.hardware_simulating_server import GPIBDevice
+from UCLA_CS_labrad.servers.hardwaresimulation.sim_instr_models import GPIBDeviceModel
 from labrad.errors import Error
 
-
-__all__=['SimulatedAgilent33210ADevice']
 #frequency,amplitude,toggle
-class SimulatedAgilent33210ADevice(GPIBDevice):
-    
+class SimulatedAgilent33210ADevice(GPIBDeviceModel):
+    name= 'Agilent33210A'
+    version = '1.0'
+    description='test function generator'
     def __init__(self):
         super().__init__()
         self.stored_frequency=1000.0

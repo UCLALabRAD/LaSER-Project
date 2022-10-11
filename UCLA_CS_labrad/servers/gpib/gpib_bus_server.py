@@ -53,6 +53,8 @@ from labrad.server import setting
 from labrad.errors import DeviceNotSelectedError
 from UCLA_CS_labrad.servers import CSPollingServer
 from twisted.internet.defer import returnValue, inlineCallbacks, DeferredLock
+from UCLA_CS_labrad.servers.hardwaresimulation.simulated_device_pyvisa_backend
+
 KNOWN_DEVICE_TYPES = ('GPIB', 'TCPIP', 'USB')
 
 
@@ -144,7 +146,8 @@ class CSGPIBBusServer(CSPollingServer):
         Currently supported are GPIB devices and GPIB over USB.
         """
         try:         
-            rm = visa.ResourceManager()
+            rm_phys = visa.ResourceManager()
+            rm_sim = visa.ResourceManager(@)
             phys_addresses=[str(x) for x in rm.list_resources()]
             phys_additions = set(phys_addresses) - set(self.phys_devices.keys())
             phys_deletions = set(self.phys_devices.keys()) - set(phys_addresses)
@@ -316,8 +319,8 @@ class CSGPIBBusServer(CSPollingServer):
         if name=='CS Hardware Simulating Server':
             yield self.client.refresh()
             self.HSS=self.client.servers['CS Hardware Simulating Server']
-            yield self.HSS.signal__simulated_gpib_device_added(8675311)
-            yield self.HSS.signal__simulated_gpib_device_removed(8675312)
+            yield self.HSS.signal__simulated_device_added(8675311)
+            yield self.HSS.signal__simulated_device_removed(8675312)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675311)
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
             
@@ -333,12 +336,12 @@ class CSGPIBBusServer(CSPollingServer):
     @setting(71, 'Add Simulated Device', address='s', device_type='s',returns='')
     def add_simulated_device(self, c, address,device_type):
         if self.HSS:
-            yield self.HSS.add_simulated_gpib_device(self.name,address,device_type)
+            yield self.HSS.add_simulated_device(self.name,address,device_type,True)
         
     @setting(72, 'Remove Simulated Device', address='s', returns='')
     def remove_simulated_device(self, c, address):
         if self.HSS:
-            yield self.HSS.remove_simulated_gpib_device(self.name,address)    
+            yield self.HSS.remove_gpib_device(self.name,address)
 
 
     def simDeviceAdded(self, c,data):

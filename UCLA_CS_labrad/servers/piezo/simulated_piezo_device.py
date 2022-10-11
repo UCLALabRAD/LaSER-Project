@@ -1,20 +1,14 @@
-"""
-### BEGIN SIMULATED SERIAL DEVICE INFO
-[info]
-name = SimulatedPiezoDevice
-version = 1.0
-description = Blah
-### END SIMULATED SERIAL DEVICE INFO
-"""
 
-from UCLA_CS_labrad.servers.serial.hardware_simulating_server import SerialDevice
+from UCLA_CS_labrad.servers.hardwaresimulation.hardware_simulating_server import SerialDeviceModel
 from labrad.errors import Error
 
 __all__=['SimulatedPiezoDevice']
 
-class SimulatedPiezoDevice(SerialDevice):
+class SimulatedPiezoDevice(SerialDeviceModel):
 
-
+    name= 'Piezo'
+    version = '1.0'
+    description='test piezo'
     
     def __init__(self):
         super().__init__()
