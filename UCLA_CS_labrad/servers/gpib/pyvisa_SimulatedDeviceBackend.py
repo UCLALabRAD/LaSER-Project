@@ -5,13 +5,13 @@ class SimulatedDeviceVisaLibrary(VisaLibraryBase):
         self.node=None
         self.cli=None
         self.ser=None
-        self.sim_devices_list=None
+        self.sim_addresses=None
 
     def open_default_resource_manager(self):
         return "DefaultResourceManagerSession", 1
         
     def list_resources(self,session,query='?*::INSTR'):
-        return tuple(self.sim_devices_list)
+        return tuple(self.sim_addresses)
 
     def open(self, session, resource_name,
              access_mode=None, open_timeout=None):

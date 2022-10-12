@@ -53,7 +53,6 @@ from labrad.server import setting
 from labrad.errors import DeviceNotSelectedError
 from UCLA_CS_labrad.servers import CSPollingServer
 from twisted.internet.defer import returnValue, inlineCallbacks, DeferredLock
-from UCLA_CS_labrad.servers.hardwaresimulation.simulated_device_pyvisa_backend
 
 KNOWN_DEVICE_TYPES = ('GPIB', 'TCPIP', 'USB')
 
@@ -77,16 +76,17 @@ class CSGPIBBusServer(CSPollingServer):
         if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
             yield self.client.refresh()
             self.HSS=self.client.servers['CS Hardware Simulating Server']
-            yield self.HSS.signal__simulated_gpib_device_added(8675311)
-            yield self.HSS.signal__simulated_gpib_device_removed(8675312)
+            yield self.HSS.signal__device_added(8675311)
+            yield self.HSS.signal__device_removed(8675312)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675311)
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
         self.rm_phys = visa.ResourceManager()
         self.rm_sim = visa.ResourceManager('l@SimulatedDeviceBackend')
-        self.rm_sim.visalib.set_attribute(rm_sim.session,'cli',self.client.context())
-        self.rm_sim.visalib.set_attribute(rm_sim.session,'HSS',self.HSS)
-        self.rm_sim.visalib.set_attribute(rm_sim.session,'node',self.name)
-        self.rm_sim.visalib.set_attribute(rm_sim.session,'sim_addresses',self.sim_addresses)
+        default_session=self.rm_sim.session
+        self.rm_sim.visalib.set_attribute(default_session,'cli',self.client)
+        self.rm_sim.visalib.set_attribute(default_session,'ser',self.HSS)
+        self.rm_sim.visalib.set_attribute(default_session,'node',self.name)
+        self.rm_sim.visalib.set_attribute(default_session,'sim_addresses',self.sim_addresses)
         self.refreshDevices()
 
         
@@ -100,7 +100,7 @@ class CSGPIBBusServer(CSPollingServer):
         Currently supported are GPIB devices and GPIB over USB.
         """
         try:
-            
+            print(self.rm_sim.list_resources())
             addresses = [str(x) for x in self.rm_phys.list_resources()+self.rm_sim.list_resources()]
             additions = set(addresses) - set(self.devices.keys())
             deletions = set(self.devices.keys()) - set(addresses)
@@ -111,7 +111,7 @@ class CSGPIBBusServer(CSPollingServer):
                         continue
                     instr = self.get_resource(addr)
                     instr.write_termination = ''
-                    instr.clear()
+                    #instr.clear()
                     if addr.endswith('SOCKET'):
                         instr.write_termination = '\n'
                     self.devices[addr] = instr
@@ -260,16 +260,18 @@ class CSGPIBBusServer(CSPollingServer):
         if name=='CS Hardware Simulating Server':
             yield self.client.refresh()
             self.HSS=self.client.servers['CS Hardware Simulating Server']
-            yield self.HSS.signal__simulated_device_added(8675311)
-            yield self.HSS.signal__simulated_device_removed(8675312)
+            yield self.HSS.signal__device_added(8675311)
+            yield self.HSS.signal__device_removed(8675312)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675311)
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
+            default_session=self.rm_sim.session
+            self.rm_sim.visalib.set_attribute(default_session,'ser',self.HSS)
             
     # SIGNALS
     @inlineCallbacks
     def serverDisconnected(self, ID, name):
         if name=='CS Hardware Simulating Server':
-            self.sim_addresses=[]
+            self.sim_addresses.clear()
             yield self.HSS.removeListener(listener=self.simDeviceAdded,source = None,ID=8675311)
             yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
             self.HSS=None
@@ -277,17 +279,16 @@ class CSGPIBBusServer(CSPollingServer):
     @setting(71, 'Add Simulated Device', address='s', device_type='s',returns='')
     def add_simulated_device(self, c, address,device_type):
         if self.HSS:
-            yield self.HSS.add_simulated_device(self.name,address,device_type,True)
+            yield self.HSS.add_device(self.name,address,device_type,True)
         
     @setting(72, 'Remove Simulated Device', address='s', returns='')
     def remove_simulated_device(self, c, address):
         if self.HSS:
-            yield self.HSS.remove_simulated_device(self.name,address)
+            yield self.HSS.remove_device(self.name,address)
 
 
     def simDeviceAdded(self, c,data):
         node, address=data
-        cli=self.client
         if node==self.name:
             self.sim_addresses.append(address)
             
