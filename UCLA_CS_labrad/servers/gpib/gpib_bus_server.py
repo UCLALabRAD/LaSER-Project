@@ -67,62 +67,10 @@ class CSGPIBBusServer(CSPollingServer):
     defaultTimeout = WithUnit(1.0, 's')
     POLL_ON_STARTUP = True
 
-    
-    class GPIBDeviceConnection(object):
-        """
-        Wrapper for our server's client connection to the serial server.
-        @raise labrad.types.Error: Error in opening serial connection
-        """
-        def __init__(self, hss, node, address,context):
-         
-            self.address=address
-         
-            self.ctxt=context
-         
-            self.ser=hss
-        
-            self.name="Simulated GPIB Device at Node "+ node +", Address "+ address
-            
-            
-            self.open= lambda: self.ser.select_device(node, address,context=self.ctxt)
-            
-            self.open()
-
-            self.write_termination=''
-            
-        @inlineCallbacks
-        def clear(self):
-            yield self.ser.reset_input_buffer(context=self.ctxt)
-
-            
-        @inlineCallbacks
-        def read_raw(self):
-            resp= yield self.ser.gpib_read(context=self.ctxt)
-            returnValue(resp.encode())
-            
-        @inlineCallbacks
-        def read_bytes(self,bytes):
-            resp= yield self.ser.gpib_read(bytes,context=self.ctxt)
-            returnValue(resp.encode())
-            
-        @inlineCallbacks
-        def write(self,data):
-            yield self.ser.gpib_write((data+self.write_termination),context=self.ctxt)
-            returnValue(len(data))
-            
-            
-        @inlineCallbacks
-        def write_raw(self,data):
-            yield self.ser.gpib_write(data.decode(),context=self.ctxt)
-            returnValue(len(data))
-
-
     @inlineCallbacks        
     def initServer(self):
         super().initServer()
         self.devices = {}
-        self.phys_devices={}
-        self.sim_devices={}
         self.sim_addresses=[]
         self.HSS=None
         servers=yield self.client.manager.servers()
@@ -133,6 +81,12 @@ class CSGPIBBusServer(CSPollingServer):
             yield self.HSS.signal__simulated_gpib_device_removed(8675312)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675311)
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
+        self.rm_phys = visa.ResourceManager()
+        self.rm_sim = visa.ResourceManager('l@SimulatedDeviceBackend')
+        self.rm_sim.visalib.set_attribute(rm_sim.session,'cli',self.client.context())
+        self.rm_sim.visalib.set_attribute(rm_sim.session,'HSS',self.HSS)
+        self.rm_sim.visalib.set_attribute(rm_sim.session,'node',self.name)
+        self.rm_sim.visalib.set_attribute(rm_sim.session,'sim_addresses',self.sim_addresses)
         self.refreshDevices()
 
         
@@ -145,52 +99,39 @@ class CSGPIBBusServer(CSPollingServer):
         Refresh the list of known devices on this bus.
         Currently supported are GPIB devices and GPIB over USB.
         """
-        try:         
-            rm_phys = visa.ResourceManager()
-            rm_sim = visa.ResourceManager(@)
-            phys_addresses=[str(x) for x in rm.list_resources()]
-            phys_additions = set(phys_addresses) - set(self.phys_devices.keys())
-            phys_deletions = set(self.phys_devices.keys()) - set(phys_addresses)
-            sim_addresses=self.sim_addresses
-            sim_additions = set(sim_addresses) - set(self.sim_devices.keys())
-            sim_deletions = set(self.sim_devices.keys()) - set(sim_addresses)
+        try:
             
-            for addr in phys_additions:
+            addresses = [str(x) for x in self.rm_phys.list_resources()+self.rm_sim.list_resources()]
+            additions = set(addresses) - set(self.devices.keys())
+            deletions = set(self.devices.keys()) - set(addresses)
+            
+            for addr in additions:
                 try:
                     if not addr.startswith(KNOWN_DEVICE_TYPES):
                         continue
-                    instr = rm.open_resource(addr)
+                    instr = self.get_resource(addr)
                     instr.write_termination = ''
                     instr.clear()
                     if addr.endswith('SOCKET'):
                         instr.write_termination = '\n'
-                    self.devices[addr] = self.phys_devices[addr]=instr
+                    self.devices[addr] = instr
                     self.sendDeviceMessage('GPIB Device Connect', addr)
                 except Exception as e:
                     print('Failed to add ' + addr + ':' + str(e))
                     raise
-            for addr in phys_deletions:
-                del self.phys_devices[addr]
+            for addr in deletions:
                 del self.devices[addr]
                 self.sendDeviceMessage('GPIB Device Disconnect', addr)
-                
-            for addr in sim_additions:
-                try:
-                    self.devices[addr]=self.sim_devices[addr]=self.GPIBDeviceConnection(self.HSS,self.name,addr,self.client.context())
-                    self.sendDeviceMessage('GPIB Device Connect', addr)
-                except Exception as e:
-                    print('Failed to add ' + addr + ':' + str(e))
-                    raise
-            for addr in sim_deletions:
-                del self.sim_devices[addr]
-                del self.devices[addr]
-                self.sendDeviceMessage('GPIB Device Disconnect', addr)
-
             
         except Exception as e:
             print('Problem while refreshing devices:', str(e))
             raise e
-
+    def get_resource(self,address):
+        try:
+            return self.rm_phys.open_resource(address)
+        except:
+            return self.rm_sim.open_resource(address)
+            
     def sendDeviceMessage(self, msg, addr):
         print(msg + ': ' + addr)
         self.client.manager.send_named_message(msg, (self.name, addr))
@@ -341,7 +282,7 @@ class CSGPIBBusServer(CSPollingServer):
     @setting(72, 'Remove Simulated Device', address='s', returns='')
     def remove_simulated_device(self, c, address):
         if self.HSS:
-            yield self.HSS.remove_gpib_device(self.name,address)
+            yield self.HSS.remove_simulated_device(self.name,address)
 
 
     def simDeviceAdded(self, c,data):
