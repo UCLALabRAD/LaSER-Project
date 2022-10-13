@@ -113,7 +113,10 @@ class experiment(experiment_info):
                 message = "In {}: Parameter {} not found among Parameter Vault parameters"
                 raise Exception (message.format(self.name, (collection, parameter_name)))
             else:
-                d['{0}.{1}'.format(collection, parameter_name)] = value
+                if type(collection)==str:
+                    collection=[collection]
+                d['{0}.{1}'.format(".".join(collection), parameter_name)] = value
+                    
         return d
 
     def set_parameters(self, parameter_dict):
@@ -124,7 +127,9 @@ class experiment(experiment_info):
         if isinstance(parameter_dict, dict):
             udpate_dict = TreeDict()
             for (collection,parameter_name), value in parameter_dict.items():
-                udpate_dict['{0}.{1}'.format(collection, parameter_name)] = value
+                if type(collection)==str:
+                    collection=[collection]
+                udpate_dict['{0}.{1}'.format(".".join(collection), parameter_name)] = value
         elif isinstance(parameter_dict, TreeDict):
             udpate_dict = parameter_dict
         else:

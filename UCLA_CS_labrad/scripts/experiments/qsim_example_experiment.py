@@ -21,8 +21,8 @@ class experiment_example(QsimExperiment):
     # variable named self.p.parameter_folder.parameter
 
     exp_parameters = []
-    exp_parameters.append(('cs_example_parameters', 'Range'))  # The format is (parameter folder, parameter)
-    exp_parameters.append(('cs_example_parameters', 'Amplitude'))
+    exp_parameters.append(('cs_example_parameters', 'Amplitude'))  # The format is (parameter folder, parameter)
+    exp_parameters.append((['cs_example_parameters','sub1'], 'subsub1.Range'))
 
     def initialize(self, cxn, context, ident):
 
@@ -47,7 +47,7 @@ class experiment_example(QsimExperiment):
         self.amplitude = self.p.cs_example_parameters.Amplitude  # shortens the amplitude name
         # the following generates a list of the points used in the scan. If the points
         # have LabRAD unit types they can be specified in the second argument
-        self.x_values = self.get_scan_list(self.p.cs_example_parameters.Range, units=None)
+        self.x_values = self.get_scan_list(self.p.cs_example_parameters.sub1.subsub1.Range, units=None)
 
         for i, x_point in enumerate(self.x_values):  # Main Loop. Every iteration will have an index i and an associated x point 
 
@@ -58,7 +58,7 @@ class experiment_example(QsimExperiment):
             should_break = self.update_progress(i/float(len(self.x_values)))
             if should_break:
                 break
-
+            
             y_point = self.amplitude * 0.5*x_point**3  # calculates the parabola
             self.dv.add(x_point, y_point)  # adds the data to Data Vault which will be automatically plotted
 
@@ -72,7 +72,7 @@ class experiment_example(QsimExperiment):
 if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()  # creates LabRAD connection
-    scanner = cxn.csscriptscanner  # connects to script scanner server
+    scanner = cxn.cs_script_scanner  # connects to script scanner server
     exprt = experiment_example(cxn=cxn)  # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)  # executes the experiment
