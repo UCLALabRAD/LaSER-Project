@@ -230,7 +230,7 @@ class CSHardwareSimulatingServer(LabradServer):
 
       
     @setting(62, 'Deselect Device',returns='')
-    def deselect_device(self,c,node):    
+    def deselect_device(self,c):    
         c['Device']=None
 
 

@@ -53,8 +53,13 @@ from labrad.server import setting
 from labrad.errors import DeviceNotSelectedError
 from UCLA_CS_labrad.servers import CSPollingServer
 from twisted.internet.defer import returnValue, inlineCallbacks, DeferredLock
+from pyvisa.resources import MessageBasedResource
+from pyvisa_SimulatedDeviceBackend import AsyncMessageBasedResource
 
-KNOWN_DEVICE_TYPES = ('GPIB', 'TCPIP', 'USB')
+KNOWN_DEVICE_TYPES = ('GPIB', 'TCPIP', 'USB','SIM')
+
+
+
 
 
 class CSGPIBBusServer(CSPollingServer):
@@ -100,7 +105,6 @@ class CSGPIBBusServer(CSPollingServer):
         Currently supported are GPIB devices and GPIB over USB.
         """
         try:
-            print(self.rm_sim.list_resources())
             addresses = [str(x) for x in self.rm_phys.list_resources()+self.rm_sim.list_resources()]
             additions = set(addresses) - set(self.devices.keys())
             deletions = set(self.devices.keys()) - set(addresses)
@@ -128,9 +132,9 @@ class CSGPIBBusServer(CSPollingServer):
             raise e
     def get_resource(self,address):
         try:
-            return self.rm_phys.open_resource(address)
+            return self.rm_phys.open_resource(address,resource_pyclass=MessageBasedResource)
         except:
-            return self.rm_sim.open_resource(address)
+            return self.rm_sim.open_resource(address,resource_pyclass=AsyncMessageBasedResource)
             
     def sendDeviceMessage(self, msg, addr):
         print(msg + ': ' + addr)
