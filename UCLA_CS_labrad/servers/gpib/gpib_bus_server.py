@@ -59,9 +59,6 @@ from pyvisa_SimulatedDeviceBackend import AsyncMessageBasedResource
 KNOWN_DEVICE_TYPES = ('GPIB', 'TCPIP', 'USB','SIM')
 
 
-
-
-
 class CSGPIBBusServer(CSPollingServer):
     """
     Provides direct access to GPIB-enabled devices.
@@ -130,6 +127,7 @@ class CSGPIBBusServer(CSPollingServer):
         except Exception as e:
             print('Problem while refreshing devices:', str(e))
             raise e
+            
     def get_resource(self,address):
         try:
             return self.rm_phys.open_resource(address,resource_pyclass=MessageBasedResource)

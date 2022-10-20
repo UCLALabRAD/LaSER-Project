@@ -311,6 +311,27 @@ class CSHardwareSimulatingServer(LabradServer):
         reload(hss_config)
         self.load_scripts()
         
+    @setting(110, )
+    def add_simulated_wire(self,c,out_dev,out_channel,in_dev,in_channel):
+        if out_dev not in self.devices or in_dev not in self.devices:
+            raise HSSError(1)
+        try:
+            out_conn=self.devices[out_dev].channels[out_channel]
+            in_conn=self.devices[in_dev].channels[in_channel]
+            in_conn.plug_in(out_conn)
+        except:
+            raise HSSError(1)
+           
+    
+    @setting(111, "reload_available_scripts")
+    def remove_simulated_wire(self,c,in_dev,in_channel):
+        try:
+            in_conn=self.devices[in_dev].channels[in_channel]
+            in_conn.unplug()
+        except:
+            raise HSSError(1)
+            
+            
     def serverConnected(self, ID, name):
         """
         Attempt to connect to last connected serial bus server upon server connection.

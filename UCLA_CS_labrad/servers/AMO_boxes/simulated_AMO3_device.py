@@ -19,10 +19,11 @@ class SimulatedPiezoDevice(SerialDeviceModel):
         self.required_stopbits=4
         self.required_rts=True
         self.required_dtr=False
-        
-        self.voltages=[0,0,0,0]
+        self.voltages=[0.0]*4
+        self.channels=[]
+        for i in range(2):
+            self.channels.append(SimulatedPiezoPMTSignal())
         self.remote_status=True
-        self.channel_on=[False,False,False,False]
         self.command_dict={
         ("remote.r",1)           : None,
         ("remote.w",2)        : None,
@@ -37,7 +38,7 @@ class SimulatedPiezoDevice(SerialDeviceModel):
     def get_channel_status(self,channel):
         channel=int(channel)
         if (1<= channel <= 4):
-            return str(int(self.channel_on[channel-1]))
+            return str(int(self.channels[channel-1].outputting))
             
                     
                         
@@ -47,10 +48,10 @@ class SimulatedPiezoDevice(SerialDeviceModel):
         if (1<= channel <= 4):
             channel=int(channel)
             if status==0:
-                self.channel_on[channel-1]=False
+                self.channel_on[channel-1].outputting=False
                 return "out.w : output {} disabled\n".format(channel)
             elif status==1:
-                self.channel_on[channel-1]=True
+                self.channel_on[channel-1].outputting=True
                 return "out.w : output {} enabled\n".format(channel)
             
                     

@@ -38,8 +38,8 @@ class GPIBDeviceModel(object):
     supports_command_chaining=True
     supports_any_prefix=False
     def __init__(self):
-        self.input_buffer=bytearray(b'')
         self.output_buffer=bytearray(b'')
+        self.input_buffer=bytearray(b'')
    
     def interpret_serial_command(self, cmd):
         if cmd==self.id_command:

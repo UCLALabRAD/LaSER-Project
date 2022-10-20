@@ -5,7 +5,7 @@ from labrad.units import WithUnit
 from labrad.gpib import GPIBDeviceWrapper
 
 
-class TektronixMSO2000Wrapper(GPIBDeviceWrapper):
+class KeysightDSOX2024AWrapper(GPIBDeviceWrapper):
 
 
     # SYSTEM
@@ -229,20 +229,17 @@ class TektronixMSO2000Wrapper(GPIBDeviceWrapper):
     def measure_setup(self, slot, channel=None, param=None):
         # convert generalized parameters to device specific parameters
         valid_measurement_parameters = {
-            "AMP": "AMP", "FREQ": "FREQ", "MAX": "MAX", "MEAN": "MEAN", "MIN": "MINI", "P2P": "PK2P"
+            "BRAT","DEL$","DUTY","FALL", "FREQ",  "NDUT","NEDG","NPUL","NWID","OVER","PEDGE","PER","PHAS$","PPUL","PRES","PWID","RIS","VAMP","VAV","VBAS","VMAX","VMIN","VPP","VRMS","VTOP","XMAX","XMIN"
         }
-        # setter
-        if slot not in (1, 2, 3, 4):
-            raise Exception("Invalid measurement slot. Must be in [1, 4].")
+
         if (channel is not None) and (param is not None):
             if param not in valid_measurement_parameters:
                 raise Exception("Invalid measurement type. Must be one of {}.".format(valid_measurement_parameters.keys()))
-            self.write('MEASU:MEAS{:d}:SOUR CH{:d}'.format(slot, channel))
-            self.write('MEASU:MEAS{:d}:TYP {:s}'.format(slot, valid_measurement_parameters[param]))
+            self.write('MEAS: CHAN{:d}'.format(slot, channel))
         # getter
-        measure_params = yield self.query('MEASU:MEAS{:d}?'.format(slot))
+        measure_params = yield self.query('MEAS{:d}?'.format(slot))
         measurement_source, measurement_type, _ = self._parseMeasurementParameters(measure_params)
-        return (slot, measurement_source, measurement_type)
+        return (measurement_source, measurement_type)
 
     @inlineCallbacks
     def measure(self, slot):
