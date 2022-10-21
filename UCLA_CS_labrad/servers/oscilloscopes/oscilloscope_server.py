@@ -17,7 +17,7 @@ timeout = 20
 from time import sleep
 from labrad.server import setting
 from labrad.gpib import GPIBManagedServer
-from EGGS_labrad.clients import createTrunk
+#from UCLA_CS_labrad.clients import createTrunk
 
 # import device wrappers
 from RigolDS1000Z import RigolDS1000ZWrapper
@@ -26,7 +26,7 @@ from KeysightDS1204G import KeysightDS1204GWrapper
 from KeysightDSOX2024A import KeysightDSOX2024AWrapper
 
 
-class OscilloscopeServer(GPIBManagedServer):
+class CSOscilloscopeServer(GPIBManagedServer):
     """
     Manages communication with all oscilloscopes.
     """
@@ -247,7 +247,7 @@ class OscilloscopeServer(GPIBManagedServer):
         """
         return self.selectedDevice(c).horizontal_scale(scale)
 
-
+    '''
     # ACQUISITION
     @setting(201, "Trace", channel='i', points='i', save='b', returns='(*v*v)')
     def trace(self, c, channel, points, save=True):
@@ -278,6 +278,7 @@ class OscilloscopeServer(GPIBManagedServer):
             #self.dv.add(amp_val, os_amplitude, sa_power, context=cntx_tmp)
         return data
 
+    '''
 
     # MEASURE
     @setting(210, "Measure Setup", slot='i', channel='i', param='s', returns='(iis)')
@@ -296,8 +297,8 @@ class OscilloscopeServer(GPIBManagedServer):
             raise Exception("Invalid measurement type. Must be one of {}.".format(str(("AMP", "FREQ", "MAX", "MEAN", "MIN", "P2P"))))
         return self.selectedDevice(c).measure_setup(slot, channel, param)
 
-    @setting(211, "Measure", slot='i', returns='v')
-    def measure(self, c, slot):
+    @setting(211, "Measure", slot='i', channel='i',param='s',returns='v')
+    def measure(self, c, slot,channel=0, param=None):
         """
         Get a measurement from a measurement slot.
         Arguments:
@@ -305,7 +306,7 @@ class OscilloscopeServer(GPIBManagedServer):
         Returns:
             (float): the measurement.
         """
-        return self.selectedDevice(c).measure(slot)
+        return self.selectedDevice(c).measure(slot,channel,param)
 
     @setting(221, "Measure Averaging", average_on='b', returns='b')
     def measure_averaging(self, c, average_on=None):
@@ -322,4 +323,4 @@ class OscilloscopeServer(GPIBManagedServer):
 
 if __name__ == '__main__':
     from labrad import util
-    util.runServer(OscilloscopeServer())
+    util.runServer(CSOscilloscopeServer())

@@ -73,7 +73,7 @@ class LaserExperiment4(QsimExperiment):
         # set up channel display
         self.os_server.autoscale()
         # set up measurement
-        self.os_server.measure_setup(1, self.p.example_parameters.Oscilloscope_Channel, "VAV")
+        self.os_server.measure_setup(1, self.p.example_parameters.Oscilloscope_Channel, "MEAN")
         self.os_server.measure_setup(2, self.p.example_parameters.Oscilloscope_Channel, "FREQ")
 
     def run(self, cxn, context):
@@ -118,8 +118,8 @@ class LaserExperiment4(QsimExperiment):
             # read & record oscilloscope value
             if (i % poll_value) == 0:
                 # get oscilloscope reading
-                voltage_mean = self.oscilloscope_server.measure(1)
-                voltage_frequency = self.oscilloscope_server.measure(2)
+                voltage_mean = self.oscilloscope_server.measure(1, self.p.example_parameters.Oscilloscope_Channel, "MEAN")
+                voltage_frequency = self.oscilloscope_server.measure(2, self.p.example_parameters.Oscilloscope_Channel, "FREQ")
                 
                 # adds the data to Data Vault
                 self.dv.add(x_point, (voltage_mean, voltage_frequency))

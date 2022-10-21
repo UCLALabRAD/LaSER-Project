@@ -52,7 +52,7 @@ class SimulatedDeviceVisaLibrary(VisaLibraryBase):
 
     @inlineCallbacks
     def write(self,session,data):
-        bytes=yield self.ser.gpib_write(data,context=session)
+        bytes=yield self.ser.gpib_write(data.decode(),context=session)
         returnValue((bytes,constants.StatusCode.success))
         
 

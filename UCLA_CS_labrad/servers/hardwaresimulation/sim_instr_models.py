@@ -31,7 +31,7 @@ class SerialDeviceModel(object):
             
 class GPIBDeviceModel(object):
 
-    termination_character=''
+    termination_character='\n'
     command_dict=None
     id_command="*IDN?"
     id_string=None
