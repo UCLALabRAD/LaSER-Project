@@ -15,7 +15,6 @@ class SimulatedAgilent33210ADevice(GPIBDeviceModel):
         self.supports_command_chaining=True
         self.id_string='Agilent Technologies,33210A,MY48007979,1.04-1.04-22-2'
         self.channels=[]
-
             
         self.command_dict={
 

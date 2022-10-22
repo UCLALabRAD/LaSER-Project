@@ -171,12 +171,17 @@ class CSSerialDeviceServer(LabradServer):
     
 
     # serial connection parameters
-    timeout = None
-    baudrate = None
-    bytesize = None
-    parity = None
-    stopbits = None
+    default_timeout = None
+    
+    
+    
+    default_baudrate = None
+    default_bytesize = None
+    default_parity = None
+    default_stopbits = None
 
+    
+    
     serial_connection_dict={}
     
     
@@ -244,8 +249,7 @@ class CSSerialDeviceServer(LabradServer):
             print('Default node and port specified. Connecting to device on startup.')
             
             serStr = yield self.findSerial(self.default_node)
-            yield self.initSerial(serStr, self.default_port, baudrate=self.baudrate, timeout=self.timeout,
-                                      bytesize=self.bytesize, parity=self.parity,stopbits=self.stopbits)
+            yield self.initSerial(serStr, self.default_port, timeout=self.default_timeout, baudrate=self.default_baudrate, bytesize=self.default_bytesize, parity=self.default_parity,stopbits=self.default_stopbits)
     @inlineCallbacks
     def stopServer(self):
         """
@@ -310,13 +314,13 @@ class CSSerialDeviceServer(LabradServer):
         @raise SerialConnectionError: Error code 1.  Raised if we could not create serial connection.
         """
         # set default timeout if not specified
-        if kwargs.get('timeout') is None and self.timeout:
-            kwargs['timeout'] = self.timeout
+        if kwargs.get('timeout') is None and self.default_timeout:
+            kwargs['timeout'] = self.default_timeout
         # print connection status
         print('Attempting to connect at:')
         print('\tserver:\t%s' % serStr)
         print('\tport:\t%s' % port)
-        print('\ttimeout:\t%s\n\n' % (str(self.timeout) if kwargs.get('timeout') is not None else 'No timeout'))
+        print('\ttimeout:\t%s\n\n' % (str(kwargs.get('timeout')) if kwargs.get('timeout') is not None else 'No timeout'))
         # find relevant serial server
         cli = self.client
    
@@ -397,8 +401,8 @@ class CSSerialDeviceServer(LabradServer):
 
 
         # DEVICE SELECTION
-    @setting(111111, 'Device Select', node='s', port='s', returns=['', '(ss)'])
-    def deviceSelect(self, c, node=None, port=None):
+    @setting(111111, 'Device Select', node='s', port='s',timeout='v[s]',baudrate='w',bytesize='w',parity='w',stopbits='w', returns=['', '(ss)'])
+    def deviceSelect(self, c, node=None, port=None, timeout=None, baudrate=None, bytesize=None, parity=None, stopbits=None):
         """
         Attempt to connect to serial device on the given node and port.
         Arguments:
@@ -414,17 +418,28 @@ class CSSerialDeviceServer(LabradServer):
         elif (node is not None) and (port is not None):
             desired_node = node
             desired_port = port
+            desired_timeout = timeout
+            desired_baudrate = baudrate
+            desired_bytesize = bytesize
+            desired_parity = parity
+            desired_stopbits = stopbits
         # connect to default values if no arguments at all
         elif ((node is None) and (port is None)) and (self.default_node and self.default_port):
             desired_node = self.default_node
             desired_port = self.default_port
+            desired_timeout = self.default_timeout
+            desired_baudrate = self.default_baudrate
+            desired_bytesize = self.default_bytesize
+            desired_parity = self.default_parity
+            desired_stopbits = self.default_stopbits
+            
         # raise error if only node or port is specified
         else:
             raise Exception('Insufficient arguments.')
         
         desired_node=yield self.findSerial(desired_node)
         if (desired_node,desired_port) not in self.serial_connection_dict:
-            yield self.initSerial(desired_node, desired_port, baudrate=self.baudrate, timeout=self.timeout, bytesize=self.bytesize, parity=self.parity)
+            yield self.initSerial(desired_node, desired_port, timeout=desired_timeout, baudrate=desired_baudrate,  bytesize=desired_bytesize, parity=desired_parity, stopbits=desired_stopbits)
         c['Serial Connection']=self.serial_connection_dict[(desired_node,desired_port)]
         c['Serial Node']=desired_node
         c['Serial Port']=desired_port

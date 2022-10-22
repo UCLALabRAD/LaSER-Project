@@ -35,6 +35,7 @@ class KeysightDSOX2024AWrapper(GPIBDeviceWrapper):
 
     @inlineCallbacks
     def channel_coupling(self, channel, coupling=None):
+        yield self.read(1000)
         chString = 'CH{:d}:COUP'.format(channel)
         if coupling is not None:
             coupling = coupling.upper()

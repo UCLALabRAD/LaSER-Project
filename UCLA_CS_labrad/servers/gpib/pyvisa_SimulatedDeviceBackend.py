@@ -40,15 +40,17 @@ class SimulatedDeviceVisaLibrary(VisaLibraryBase):
             return constants.StatusCode.success
 
         else:
-            self.HSS.deselect_device(self.node, resource_name,context=session)
             return constants.StatusCode.success
-
             
     @inlineCallbacks
     def read(self,session,count): 
-        resp=yield self.ser.gpib_read(count,context=session)
-        returnValue((resp.encode(),constants.StatusCode.success))
-        
+            resp=yield self.ser.gpib_read(count,context=session)
+            print(str(count)+"BUT"+str(resp))
+            if count and len(resp) < count:
+                raise errors.VisaIOError(constants.StatusCode.error_timeout)
+            returnValue((resp.encode(),constants.StatusCode.success))
+
+            
 
     @inlineCallbacks
     def write(self,session,data):
@@ -70,10 +72,11 @@ class SimulatedDeviceVisaLibrary(VisaLibraryBase):
         return constants.StatusCode.success
     
     
-    def clear(self):
+    def clear(self,session):
         self.ser.reset_input_buffer(context=session)
         self.ser.reset_output_buffer(context=session)
         return constants.StatusCode.success
+    
     
         
             

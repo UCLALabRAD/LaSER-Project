@@ -31,7 +31,7 @@ class SerialDeviceModel(object):
             
 class GPIBDeviceModel(object):
 
-    termination_character='\n'
+    
     command_dict=None
     id_command="*IDN?"
     id_string=None
@@ -40,6 +40,7 @@ class GPIBDeviceModel(object):
     def __init__(self):
         self.output_buffer=bytearray(b'')
         self.input_buffer=bytearray(b'')
+        self.termination_character='\n'
    
     def interpret_serial_command(self, cmd):
         if cmd==self.id_command:

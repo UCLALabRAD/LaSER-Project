@@ -165,7 +165,7 @@ class CSHardwareSimulatingServer(LabradServer):
         if active_device.input_buffer:
             active_device.input_buffer=active_device.input_buffer[:-1]
             if not invalid_command_entered:
-                active_device.input_buffer.extend(active_device.termination_character)
+                active_device.input_buffer.extend(active_device.termination_character.encode())
             
         
     
@@ -306,12 +306,12 @@ class CSHardwareSimulatingServer(LabradServer):
         """Get information about all servers on this node."""
         return "Serial Devices:\n" + "\n\n".join(["Name: "+model.name +"\nVersion: " + model.version+ "\nDescription: " +model.description for model in self.sim_instr_models.values() if not (issubclass(model.cls,GPIBDeviceModel))]) + "\n\n" +"GPIB Devices:\n" + "\n\n".join(["Name: "+model.name +"\nVersion: " + model.version+ "\nDescription: " +model.description for model in self.sim_instr_models.values() if (issubclass(model.cls,GPIBDeviceModel))])
 
-    @setting(100, "reload_available_scripts")
+    @setting(100, "Reload Available Device Types")
     def reload_available_scripts(self, c):
         reload(hss_config)
         self.load_scripts()
         
-    @setting(110, )
+    @setting(110, "Add Simulated Wire",out_dev='s',out_channel='i',in_dev='s',in_channel='i')
     def add_simulated_wire(self,c,out_dev,out_channel,in_dev,in_channel):
         if out_dev not in self.devices or in_dev not in self.devices:
             raise HSSError(1)
@@ -323,7 +323,7 @@ class CSHardwareSimulatingServer(LabradServer):
             raise HSSError(1)
            
     
-    @setting(111, "reload_available_scripts")
+    @setting(111, "Remove Simulated Wire",in_dev='s',in_channel='i')
     def remove_simulated_wire(self,c,in_dev,in_channel):
         try:
             in_conn=self.devices[in_dev].channels[in_channel]

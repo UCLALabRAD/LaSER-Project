@@ -55,6 +55,7 @@ class CSSerialServer(CSPollingServer):
         
         active_device_connections=[]
         def __init__(self, hss, node, port,context):
+        
             self.port=port
             
             self.ctxt=context
@@ -63,7 +64,7 @@ class CSSerialServer(CSPollingServer):
         
             self.name="Simulated Serial Device at Node "+ node +", Port "+ self.port
             
-            self.timeout=1
+            self.timeout=0
             
             self.is_broken=False
         
@@ -101,74 +102,61 @@ class CSSerialServer(CSPollingServer):
                 pass
          
         @property
-        @inlineCallbacks
         def in_waiting(self):
-            val= yield self.ser.get_in_waiting(context=self.ctxt)
-            returnValue(val)
+            return self.ser.get_in_waiting(context=self.ctxt)
 
         @property
-        @inlineCallbacks
         def out_waiting(self):
-            val= yield self.ser.get_out_waiting(context=self.ctxt)
-            returnValue(val)
+            return self.ser.get_out_waiting(context=self.ctxt)
             
         @inlineCallbacks
         def read(self,bytes):
             resp= yield self.ser.serial_read(bytes,context=self.ctxt)
             returnValue(resp.encode())
+        
                 
-        @inlineCallbacks
         def write(self,data):
-            yield self.ser.serial_write(data,context=self.ctxt)
+            return self.ser.serial_write(data,context=self.ctxt)
 
 
         @property
-        @inlineCallbacks
         def baudrate(self):
-            resp=yield self.ser.baudrate(None,context=self.ctxt)
-            returnValue(resp)
+            return self.ser.baudrate(None,context=self.ctxt)
+
              
         @baudrate.setter
-        @inlineCallbacks
         def baudrate(self, val):
-            yield self.ser.baudrate(val,context=self.ctxt)
+            self.ser.baudrate(val,context=self.ctxt)
+
             
                 
         @property
-        @inlineCallbacks
         def bytesize(self):
-            resp=yield self.ser.bytesize(None,context=self.ctxt)
-            returnValue(resp)
-                
+            return self.ser.bytesize(None,context=self.ctxt)
+
                 
         @bytesize.setter
-        @inlineCallbacks
         def bytesize(self, val):
-            yield self.ser.bytesize(val,context=self.ctxt)
+            self.ser.bytesize(val,context=self.ctxt)
 
         @property
-        @inlineCallbacks
         def parity(self):
-            resp=yield self.ser.parity(None,context=self.ctxt)
-            returnValue(resp)
+            return self.ser.parity(None,context=self.ctxt)
                 
                 
         @parity.setter
-        @inlineCallbacks
         def parity(self, val):
-            yield self.ser.parity(val,context=self.ctxt)
+            self.ser.parity(val,context=self.ctxt)
 
 
         @property
-        @inlineCallbacks
         def stopbits(self):
-            resp=yield self.ser.stopbits(None,context=self.ctxt)
-            returnValue(resp)
+            return self.ser.stopbits(None,context=self.ctxt)
+      
                 
         @stopbits.setter
-        @inlineCallbacks
         def stopbits(self, val):
-            yield self.ser.stopbits(val,context=self.ctxt)
+            self.ser.stopbits(val,context=self.ctxt)
              
         @property
         def dtr(self):
@@ -176,9 +164,8 @@ class CSSerialServer(CSPollingServer):
 
         
         @dtr.setter
-        @inlineCallbacks
         def dtr(self, val):
-            yield self.ser.dtr(val,context=self.ctxt)
+            self.ser.dtr(val,context=self.ctxt)
 
         
         @property
@@ -186,9 +173,8 @@ class CSSerialServer(CSPollingServer):
             pass
 
         @rts.setter
-        @inlineCallbacks
         def rts(self, val):
-            yield self.ser.rts(val,context=self.ctxt)
+            self.ser.rts(val,context=self.ctxt)
                
 
 
@@ -206,8 +192,8 @@ class CSSerialServer(CSPollingServer):
         servers=yield self.client.manager.servers()
         if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
             self.HSS=self.client.servers['CS Hardware Simulating Server']
-            yield self.HSS.signal__simulated_serial_device_added(8675309)
-            yield self.HSS.signal__simulated_serial_device_removed(8675310)
+            yield self.HSS.signal__device_added(8675309)
+            yield self.HSS.signal__device_removed(8675310)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
         self.enumerate_serial_pyserial()
@@ -296,7 +282,7 @@ class CSSerialServer(CSPollingServer):
         /dev/ prefix.  This is case insensitive on windows, case sensitive
         on Linux.  For compatibility, always use the same case.
         """
-        
+        c['Timeout'] = 0
         if 'PortObject' in c and c['PortObject']:
             yield c['PortObject'].close()
             c['PortObject']=None
@@ -348,7 +334,7 @@ class CSSerialServer(CSPollingServer):
             ser.baudrate=data
         resp= ser.baudrate
         return resp
-        
+    
     @setting(32, 'Bytesize', data=[': Query current bytesize', 'w: Set bytesize'], returns='w: Selected bytesize')
     def bytesize(self, c, data=None):
         """
@@ -393,10 +379,8 @@ class CSSerialServer(CSPollingServer):
         """
         Sets a timeout for read operations.
         """
-        ser = self.getPort(c)
-        timeout_val=min(data['s'], 300)
-        ser.timeout=timeout_val
-        returnValue(ser.timeout, 's')
+        c['Timeout'] = min(data['s'], 300)
+        return Value(c['Timeout'], 's')
 
 
     # FLOW CONTROL
@@ -504,7 +488,7 @@ class CSSerialServer(CSPollingServer):
             resp=yield ser.read(10000)
             returnValue(resp)
 
-        timeout = ser.timeout
+        timeout = c['Timeout']
         if timeout == 0:
             resp=yield ser.read(count)
             returnValue(resp)
@@ -561,7 +545,7 @@ class CSSerialServer(CSPollingServer):
         """
         
         ser = self.getPort(c)
-        timeout = ser.timeout
+        timeout = c['Timeout']
         # set default end character if not specified
         if data:
             # ensure end character is of type byte
@@ -614,7 +598,7 @@ class CSSerialServer(CSPollingServer):
             size    (int)   : the serial buffer size.
         """
         ser=self.getPort(c)
-        yield ser.set_buffer_size(size)
+        ser.set_buffer_size(size)
 
 
     @setting(64, 'Buffer Waiting Input', returns='i')
@@ -664,8 +648,8 @@ class CSSerialServer(CSPollingServer):
         if name=='CS Hardware Simulating Server':
             yield self.client.refresh()
             self.HSS=self.client.servers['CS Hardware Simulating Server']
-            yield self.HSS.signal__simulated_serial_device_added(8675309)
-            yield self.HSS.signal__simulated_serial_device_removed(8675310)
+            yield self.HSS.signal__device_added(8675309)
+            yield self.HSS.signal__device_removed(8675310)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
             

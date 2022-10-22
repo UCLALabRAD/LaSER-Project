@@ -112,7 +112,7 @@ class CSGPIBBusServer(CSPollingServer):
                         continue
                     instr = self.get_resource(addr)
                     instr.write_termination = ''
-                    #instr.clear()
+                    instr.clear()
                     if addr.endswith('SOCKET'):
                         instr.write_termination = '\n'
                     self.devices[addr] = instr
@@ -121,6 +121,7 @@ class CSGPIBBusServer(CSPollingServer):
                     print('Failed to add ' + addr + ':' + str(e))
                     raise
             for addr in deletions:
+                self.devices[addr].close()
                 del self.devices[addr]
                 self.sendDeviceMessage('GPIB Device Disconnect', addr)
             
@@ -138,8 +139,6 @@ class CSGPIBBusServer(CSPollingServer):
         print(msg + ': ' + addr)
         self.client.manager.send_named_message(msg, (self.name, addr))
 
-    def initContext(self, c):
-        c['timeout'] = self.defaultTimeout
 
     def getDevice(self, c):
         if 'addr' not in c:
@@ -167,8 +166,8 @@ class CSGPIBBusServer(CSPollingServer):
         Get or set the GPIB timeout.
         """
         if time is not None:
-            c['timeout'] = time
-        return c['timeout']
+            self.getDevice(c).timeout=time['ms']
+        return WithUnit(self.getDevice(c).timeout/1000.0,'s')
 
     @setting(3, data='s', returns='')
     def write(self, c, data):
@@ -262,6 +261,7 @@ class CSGPIBBusServer(CSPollingServer):
         if name=='CS Hardware Simulating Server':
             yield self.client.refresh()
             self.HSS=self.client.servers['CS Hardware Simulating Server']
+			
             yield self.HSS.signal__device_added(8675311)
             yield self.HSS.signal__device_removed(8675312)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675311)
@@ -291,6 +291,7 @@ class CSGPIBBusServer(CSPollingServer):
 
     def simDeviceAdded(self, c,data):
         node, address=data
+        print("here")
         if node==self.name:
             self.sim_addresses.append(address)
             
