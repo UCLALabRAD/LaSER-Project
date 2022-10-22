@@ -165,8 +165,8 @@ class CSSerialDeviceServer(LabradServer):
     # node parameters
     name = 'CSSerialDevice'
     reg_key = None
-    default_port = None #'cu.usbserial-AM00QYUP'
-    default_node = None #'landons-macbook-pro.local'
+    default_port = 'piezo'
+    default_node = 'landons-macbook-pro.local'
     
     
 

@@ -238,7 +238,7 @@ class CSHardwareSimulatingServer(LabradServer):
     def baudrate(self,c,val):
         active_device=c['Device']
         if val:
-            if val!=active_device.required_baudrate:
+            if active_device.required_baudrate and val!=active_device.required_baudrate:
                 raise SimulatedDeviceError(1)
             else:
                 active_device.actual_baudrate=val
@@ -248,7 +248,7 @@ class CSHardwareSimulatingServer(LabradServer):
     def bytesize(self,c,val):
         active_device=c['Device']
         if val:
-            if val!=active_device.required_bytesize:
+            if active_device.required_bytesize and val!=active_device.required_bytesize:
                 raise SimulatedDeviceError(1)
             else:
                 active_device.actual_bytesize=val
@@ -258,7 +258,7 @@ class CSHardwareSimulatingServer(LabradServer):
     def parity(self,c,val):
         active_device=c['Device']
         if val:
-            if val!=active_device.required_parity:
+            if active_device.required_parity and val!=active_device.required_parity:
                 raise SimulatedDeviceError(1)
             else:
                 active_device.actual_parity=val
@@ -267,32 +267,32 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(74, 'Stopbits', val=[': Query current stopbits', 'w: Set stopbits'], returns='w: Selected stopbits')
     def stopbits(self,c,val):
         active_device=c['Device']
-        if val!=active_device.required_stopbits:
-            raise SimulatedDeviceError(1)
-        else:
-            active_device.actual_stopbits=val
+        if val:
+            if active_device.required_stopbits and val!=active_device.required_stopbits:
+                raise SimulatedDeviceError(1)
+            else:
+                active_device.actual_stopbits=val
         return active_device.actual_stopbits
         
     @setting(75, 'RTS', val='b', returns='b')
     def rts(self,c,val):
         active_device=c['Device']
- 
-        if val!=active_device.required_rts:
-            raise SimulatedDeviceError(1)
-        else:
-            active_device.actual_rts=val
+        if val:
+            if active_device.required_rts and val!=active_device.required_rts:
+                raise SimulatedDeviceError(1)
+            else:
+                active_device.actual_rts=val
         return active_device.actual_rts
         
     @setting(76, 'DTR', val='b', returns='b')
     def dtr(self,c,val):
         active_device=c['Device']
- 
-        if val!=active_device.required_dtr:
-            raise SimulatedDeviceError(1)
-        else:
-            active_device.actual_dtr=val
+        if val:
+            if active_device.required_dtr and val!=active_device.required_dtr:
+                raise SimulatedDeviceError(1)
+            else:
+                active_device.actual_dtr=val
         return active_device.actual_dtr
-        
         
     @setting(81, 'Buffer Size', returns='')
     def buffer_size(self,c):
@@ -311,25 +311,28 @@ class CSHardwareSimulatingServer(LabradServer):
         reload(hss_config)
         self.load_scripts()
         
-    @setting(110, "Add Simulated Wire",out_dev='s',out_channel='i',in_dev='s',in_channel='i')
-    def add_simulated_wire(self,c,out_dev,out_channel,in_dev,in_channel):
-        if out_dev not in self.devices or in_dev not in self.devices:
-            raise HSSError(1)
-        try:
-            out_conn=self.devices[out_dev].channels[out_channel]
-            in_conn=self.devices[in_dev].channels[in_channel]
-            in_conn.plug_in(out_conn)
-        except:
-            raise HSSError(1)
+    @setting(110, "Add Simulated Wire",out_node='s',out_port='s',out_channel='i',in_node='s',in_port='s',in_channel='i')
+    def add_simulated_wire(self,c,out_node,out_port,out_channel,in_node,in_port,in_channel):
+        out_dev=(out_node,out_port)
+        in_dev=(in_node,in_port)
+        #if out_dev not in self.devices or in_dev not in self.devices:
+        #raise HSSError(1)
+       # try:
+        out_conn=self.devices[out_dev].channels[out_channel-1]
+        in_conn=self.devices[in_dev].channels[in_channel-1]
+        in_conn.plug_in(out_conn)
+       # except:
+            #raise HSSError(1)
            
     
-    @setting(111, "Remove Simulated Wire",in_dev='s',in_channel='i')
-    def remove_simulated_wire(self,c,in_dev,in_channel):
-        try:
-            in_conn=self.devices[in_dev].channels[in_channel]
-            in_conn.unplug()
-        except:
-            raise HSSError(1)
+    @setting(111, "Remove Simulated Wire",in_node='s',in_port='s',in_channel='i')
+    def remove_simulated_wire(self,c,in_node,in_port,in_channel):
+        in_dev=(in_node,in_port)
+        #try:
+        in_conn=self.devices[in_dev].channels[in_channel-1]
+        in_conn.unplug()
+        #except:
+            #raise HSSError(1)
             
             
     def serverConnected(self, ID, name):

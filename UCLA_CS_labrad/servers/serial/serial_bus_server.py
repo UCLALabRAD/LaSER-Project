@@ -357,7 +357,6 @@ class CSSerialServer(CSPollingServer):
         if data:
             ser.parity=data
         resp= ser.parity
-        resp.addCallback(lambda x: int(x))
         return resp
         
     @setting(34, 'Stopbits', data=[': Query current stopbits', 'w: Set stopbits'], returns='w: Selected stopbits')
@@ -369,7 +368,7 @@ class CSSerialServer(CSPollingServer):
 
         if data:
             ser.stopbits=data
-        resp.addCallback(lambda x: int(x))
+        resp=ser.stopbits
         return resp
         
         
@@ -390,7 +389,7 @@ class CSSerialServer(CSPollingServer):
         Sets the state of the RTS line.
         """
         ser = self.getPort(c)
-        ser.rts=int(data)
+        ser.rts=data
         return data
 
     @setting(38, 'DTR', data=['b'], returns=['b'])
@@ -399,7 +398,7 @@ class CSSerialServer(CSPollingServer):
         Sets the state of the DTR line.
         """
         ser = self.getPort(c)
-        ser.dtr=int(data)
+        ser.dtr=data
         return data
 
 
@@ -417,7 +416,7 @@ class CSSerialServer(CSPollingServer):
             data = data.encode()
         yield ser.write(data)
 
-        return int(len(data))
+        returnValue(int(len(data)))
 
     @setting(42, 'Write Line', data=['s: Data to send'], returns=['w: Bytes sent'])
     def write_line(self, c, data,simulated=None):
@@ -432,7 +431,7 @@ class CSSerialServer(CSPollingServer):
         data += b'\r\n'
         yield ser.write(data)
 
-        return int(len(data))
+        returnValue(int(len(data)))
 
     @setting(43, 'Pause', duration='v[s]: Time to pause', returns=[])
     def pause(self, c, duration):
@@ -629,12 +628,12 @@ class CSSerialServer(CSPollingServer):
     @setting(71, 'Add Simulated Device', port='s', returns='')
     def add_simulated_device(self, c, port,device_type):
         if self.HSS:
-            yield self.HSS.add_simulated_serial_device(self.name,port,device_type)
+            yield self.HSS.add_device(self.name,port,device_type,False)
         
     @setting(72, 'Remove Simulated Device', port='s', returns='')
     def remove_simulated_device(self, c, port):
         if self.HSS:
-            yield self.HSS.remove_simulated_serial_device(self.name,port)    
+            yield self.HSS.remove_device(self.name,port)
 
 
     # SIGNALS

@@ -2,27 +2,29 @@
 from UCLA_CS_labrad.servers.hardwaresimulation.hardware_simulating_server import SerialDeviceModel
 from labrad.errors import Error
 
+from UCLA_CS_labrad.servers.hardwaresimulation.simulated_cables import SimulatedPiezoPMTSignal
+
 __all__=['SimulatedPiezoDevice']
 
 class SimulatedPiezoDevice(SerialDeviceModel):
 
-    name= 'Piezo'
+    name= 'AMO3'
     version = '1.0'
     description='test piezo'
     
     def __init__(self):
         super().__init__()
         
-        self.required_baudrate=38400
-        self.required_bytesize=2
-        self.required_parity=3
-        self.required_stopbits=4
-        self.required_rts=True
-        self.required_dtr=False
+        self.required_baudrate=None
+        self.required_bytesize=None
+        self.required_parity=None
+        self.required_stopbits=None
+        self.required_rts=None
+        self.required_dtr=None
         self.voltages=[0.0]*4
         self.channels=[]
         for i in range(2):
-            self.channels.append(SimulatedPiezoPMTSignal())
+            self.channels.append(SimulatedPiezoPMTSignal(self,i+1))
         self.remote_status=True
         self.command_dict={
         ("remote.r",1)           : None,
@@ -48,10 +50,10 @@ class SimulatedPiezoDevice(SerialDeviceModel):
         if (1<= channel <= 4):
             channel=int(channel)
             if status==0:
-                self.channel_on[channel-1].outputting=False
+                self.channels[channel-1].outputting=False
                 return "out.w : output {} disabled\n".format(channel)
             elif status==1:
-                self.channel_on[channel-1].outputting=True
+                self.channels[channel-1].outputting=True
                 return "out.w : output {} enabled\n".format(channel)
             
                     
@@ -63,6 +65,7 @@ class SimulatedPiezoDevice(SerialDeviceModel):
         current_voltage=None
         if (1<= channel <= 4):
                 current_voltage=self.voltages[channel-1]
+        print("here")
         return "{:.2f}\n".format(current_voltage)
                 
                 
