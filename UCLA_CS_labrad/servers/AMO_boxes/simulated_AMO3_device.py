@@ -15,7 +15,7 @@ class SimulatedPiezoDevice(SerialDeviceModel):
     def __init__(self):
         super().__init__()
         
-        self.required_baudrate=None
+        self.required_baudrate=38400
         self.required_bytesize=None
         self.required_parity=None
         self.required_stopbits=None

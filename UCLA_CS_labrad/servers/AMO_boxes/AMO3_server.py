@@ -1,7 +1,7 @@
 """
 ### BEGIN NODE INFO
 [info]
-name = AMO3 Server
+name = AMO3Server
 version = 1.0.0
 description = Communicates with the AMO3 box for control of piezo voltages.
 instancename = AMO3Server
@@ -20,21 +20,21 @@ from labrad.units import WithUnit
 from labrad.server import setting, Signal, inlineCallbacks
 
 from twisted.internet.defer import returnValue
-from EGGS_labrad.servers import SerialDeviceServer
+from UCLA_CS_labrad.servers import CSSerialDeviceServer
 
 TERMINATOR = '\r\n'
 
 
-class AMO3Server(SerialDeviceServer):
+class AMO3Server(CSSerialDeviceServer):
     """
     Communicates with the AMO3 box for control of piezo voltages.
     """
 
-    name = 'AMO3 Server'
+    name = 'AMO3Server'
     regKey = 'AMO3Server'
-    serNode = 'MongKok'
-    port = 'COM10'
-
+    default_node = 'penny CS Serial Server'
+    default_port = 'SIMpiezo'
+    
     timeout = WithUnit(3.0, 's')
     baudrate = 38400
 
@@ -45,6 +45,7 @@ class AMO3Server(SerialDeviceServer):
 
     # CONTEXTS
     def initContext(self, c):
+        super().initContext(c)
         self.listeners.add(c.ID)
 
     def expireContext(self, c):
@@ -81,15 +82,15 @@ class AMO3Server(SerialDeviceServer):
                             (bool)  : whether the device accepts serial commands
         """
         if remote_status is not None:
-            yield self.ser.acquire()
-            yield self.ser.write('remote.w {:d}\r\n'.format(remote_status))
-            yield self.ser.read_line('\n')
-            self.ser.release()
+            yield c['Serial Connection'].acquire()
+            yield c['Serial Connection'].write('remote.w {:d}\r\n'.format(remote_status))
+            yield c['Serial Connection'].read_line('\n')
+            c['Serial Connection'].release()
         # getter
-        yield self.ser.acquire()
-        yield self.ser.write('remote.r\r\n')
-        resp = yield self.ser.read_line('\n')
-        self.ser.release()
+        yield c['Serial Connection'].acquire()
+        yield c['Serial Connection'].write('remote.r\r\n')
+        resp = yield c['Serial Connection'].read_line('\n')
+        c['Serial Connection'].release()
         # parse
         resp = bool(int(resp.strip()))
         returnValue(resp)
@@ -110,15 +111,15 @@ class AMO3Server(SerialDeviceServer):
             raise Exception("Error: channel must be one of (1, 2, 3, 4).")
         # setter
         if power is not None:
-            yield self.ser.acquire()
-            yield self.ser.write('out.w {:d} {:d}\r\n'.format(channel, power))
-            yield self.ser.read_line('\n')
-            self.ser.release()
+            yield c['Serial Connection'].acquire()
+            yield c['Serial Connection'].write('out.w {:d} {:d}\r\n'.format(channel, power))
+            yield c['Serial Connection'].read_line('\n')
+            c['Serial Connection'].release()
         # getter
-        yield self.ser.acquire()
-        yield self.ser.write('out.r {:d}\r\n'.format(channel))
-        resp = yield self.ser.read_line('\n')
-        self.ser.release()
+        yield c['Serial Connection'].acquire()
+        yield c['Serial Connection'].write('out.r {:d}\r\n'.format(channel))
+        resp = yield c['Serial Connection'].read_line('\n')
+        c['Serial Connection'].release()
         # parse
         resp = resp.strip()
         resp = bool(int(resp))
@@ -143,15 +144,15 @@ class AMO3Server(SerialDeviceServer):
         if voltage is not None:
             if (voltage < 0) or (voltage > 150):
                 raise Exception("Error: voltage must be in [0, 150].")
-            yield self.ser.acquire()
-            yield self.ser.write('vout.w {:d} {:3f}\r\n'.format(channel, voltage))
-            yield self.ser.read_line('\n')
-            self.ser.release()
+            yield c['Serial Connection'].acquire()
+            yield c['Serial Connection'].write('vout.w {:d} {:3f}\r\n'.format(channel, voltage))
+            yield c['Serial Connection'].read_line('\n')
+            c['Serial Connection'].release()
         # getter
-        yield self.ser.acquire()
-        yield self.ser.write('vout.r {:d}\r\n'.format(channel))
-        resp = yield self.ser.read_line('\n')
-        self.ser.release()
+        yield c['Serial Connection'].acquire()
+        yield c['Serial Connection'].write('vout.r {:d}\r\n'.format(channel))
+        resp = yield c['Serial Connection'].read_line('\n')
+        c['Serial Connection'].release()
         resp = float(resp)
         self.notifyOtherListeners(c, (channel, resp), self.voltage_update)
         returnValue(float(resp))

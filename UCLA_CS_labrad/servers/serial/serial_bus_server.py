@@ -123,6 +123,7 @@ class CSSerialServer(CSPollingServer):
         def baudrate(self):
             return self.ser.baudrate(None,context=self.ctxt)
 
+
              
         @baudrate.setter
         def baudrate(self, val):
@@ -134,6 +135,7 @@ class CSSerialServer(CSPollingServer):
         def bytesize(self):
             return self.ser.bytesize(None,context=self.ctxt)
 
+
                 
         @bytesize.setter
         def bytesize(self, val):
@@ -141,7 +143,8 @@ class CSSerialServer(CSPollingServer):
 
         @property
         def parity(self):
-            return self.ser.parity(None,context=self.ctxt)
+            return self.ser.bytesize(None,context=self.ctxt)
+
                 
                 
         @parity.setter
@@ -152,6 +155,7 @@ class CSSerialServer(CSPollingServer):
         @property
         def stopbits(self):
             return self.ser.stopbits(None,context=self.ctxt)
+            
       
                 
         @stopbits.setter

@@ -165,20 +165,20 @@ class CSSerialDeviceServer(LabradServer):
     # node parameters
     name = 'CSSerialDevice'
     reg_key = None
-    default_port = 'piezo'
-    default_node = 'landons-macbook-pro.local'
+    default_port = None
+    default_node = None
     
     
 
     # serial connection parameters
-    default_timeout = None
+    timeout = None
     
     
     
-    default_baudrate = None
-    default_bytesize = None
-    default_parity = None
-    default_stopbits = None
+    baudrate = None
+    bytesize = None
+    parity = None
+    stopbits = None
 
     
     
@@ -249,7 +249,7 @@ class CSSerialDeviceServer(LabradServer):
             print('Default node and port specified. Connecting to device on startup.')
             
             serStr = yield self.findSerial(self.default_node)
-            yield self.initSerial(serStr, self.default_port, timeout=self.default_timeout, baudrate=self.default_baudrate, bytesize=self.default_bytesize, parity=self.default_parity,stopbits=self.default_stopbits)
+            yield self.initSerial(serStr, self.default_port, timeout=self.timeout, baudrate=self.baudrate, bytesize=self.bytesize, parity=self.parity,stopbits=self.stopbits)
     @inlineCallbacks
     def stopServer(self):
         """
@@ -418,20 +418,11 @@ class CSSerialDeviceServer(LabradServer):
         elif (node is not None) and (port is not None):
             desired_node = node
             desired_port = port
-            desired_timeout = timeout
-            desired_baudrate = baudrate
-            desired_bytesize = bytesize
-            desired_parity = parity
-            desired_stopbits = stopbits
+
         # connect to default values if no arguments at all
         elif ((node is None) and (port is None)) and (self.default_node and self.default_port):
             desired_node = self.default_node
             desired_port = self.default_port
-            desired_timeout = self.default_timeout
-            desired_baudrate = self.default_baudrate
-            desired_bytesize = self.default_bytesize
-            desired_parity = self.default_parity
-            desired_stopbits = self.default_stopbits
             
         # raise error if only node or port is specified
         else:
@@ -439,7 +430,7 @@ class CSSerialDeviceServer(LabradServer):
         
         desired_node=yield self.findSerial(desired_node)
         if (desired_node,desired_port) not in self.serial_connection_dict:
-            yield self.initSerial(desired_node, desired_port, timeout=desired_timeout, baudrate=desired_baudrate,  bytesize=desired_bytesize, parity=desired_parity, stopbits=desired_stopbits)
+            yield self.initSerial(desired_node, desired_port, timeout=self.timeout, baudrate=self.baudrate,  bytesize=self.bytesize, parity=self.parity, stopbits=self.stopbits)
         c['Serial Connection']=self.serial_connection_dict[(desired_node,desired_port)]
         c['Serial Node']=desired_node
         c['Serial Port']=desired_port

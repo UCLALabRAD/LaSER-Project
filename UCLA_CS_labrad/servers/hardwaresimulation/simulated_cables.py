@@ -20,7 +20,7 @@ class SimulatedPiezoPMTSignal(SimulatedOutSignal):
     
     def calculate_voltage_value(self):
         if self.outputting:
-    	    return self.dev.voltages[channel-1]
+    	    return self.dev.voltages[self.channel-1]
         else:
             return 0.0
 

@@ -4,7 +4,7 @@ import time
 import labrad
 import numpy as np
 from labrad.units import WithUnit as U
-from Qsim.scripts.experiments.qsimexperiment import QsimExperiment
+from UCLA_CS_labrad.scripts.experiments.qsimexperiment import QsimExperiment
 
 
 class LaserExperiment4(QsimExperiment):
@@ -28,7 +28,8 @@ class LaserExperiment4(QsimExperiment):
     # The format is (parameter folder, parameter)
     exp_parameters = [
         # piezo parameters
-        ('example_parameters', 'Piezo_Connection'),
+        ('example_parameters', 'Piezo_Connection_Bus'),
+		('example_parameters', 'Piezo_Connection_Port'),
         ('example_parameters', 'Piezo_Channel'),
 
         # oscilloscope parameters
@@ -63,7 +64,7 @@ class LaserExperiment4(QsimExperiment):
 
         # set up piezo
         self.piezo_server = cxn.piezo_server
-        self.piezo_server.device_select(self.p.example_parameters.Piezo_Connection)
+        self.piezo_server.device_select(self.p.example_parameters.Piezo_Connection_Bus,self.p.example_parameters.Piezo_Connection_Port)
         self.piezo_server.toggle(self.p.example_parameters.Piezo_Channel, True)
 
         # set up oscilloscope
@@ -136,7 +137,7 @@ class LaserExperiment4(QsimExperiment):
 if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()                                  # creates LabRAD connection
-    scanner = cxn.scriptscanner                             # connects to script scanner server
-    exprt = experiment_example(cxn=cxn)                     # instantiates the experiment
+    scanner = cxn.cs_script_scanner                             # connects to script scanner server
+    exprt = LaserExperiment4(cxn=cxn)                     # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)    # registers an experiment with Script Scanner
     exprt.execute(ident)                                    # executes the experiment
