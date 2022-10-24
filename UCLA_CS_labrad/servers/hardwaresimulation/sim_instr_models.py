@@ -1,3 +1,4 @@
+from twisted.internet.defer import inlineCallbacks, returnValue
 class SerialDeviceModel(object):
 
     required_baudrate=None
@@ -39,25 +40,26 @@ class GPIBDeviceModel(object):
     id_string=None
     supports_command_chaining=True
     supports_any_prefix=False
+	
     def __init__(self):
         self.output_buffer=bytearray(b'')
         self.input_buffer=bytearray(b'')
         self.termination_character='\n'
-   
+		
+    @inlineCallbacks
     def interpret_serial_command(self, cmd):
         if cmd==self.id_command:
                 return self.id_string
         for cmd_specs, func in self.command_dict.items():
             if (self.is_valid_cmd(cmd,cmd_specs)):
                 _,*args=cmd.split(" ")
-                resp=func(*args)
+                resp= yield func(*args)
                 if resp:
-                    return resp
+                    returnValue(resp)
                 else:
-                    return ""
-        return None
-        
-        
+                    returnValue("")
+        returnValue(None)
+            
     def is_valid_cmd(self,cmd,cmd_format):
         cmd,*args=cmd.split(' ')
         cmd_format,num_args=cmd_format

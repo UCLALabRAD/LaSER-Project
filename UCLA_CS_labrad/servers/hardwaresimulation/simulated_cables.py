@@ -16,11 +16,11 @@ class SimulatedOutSignal(object):
 
 class SimulatedPiezoPMTSignal(SimulatedOutSignal):
     def __init__(self,dev,channel):
-    	super().__init__(dev,channel)
+        super().__init__(dev,channel)
     
     def calculate_voltage_value(self):
         if self.outputting:
-    	    return self.dev.voltages[self.channel-1]
+            return self.dev.voltages[self.channel-1]
         else:
             return 0.0
 
@@ -28,10 +28,11 @@ class SimulatedPiezoPMTSignal(SimulatedOutSignal):
 class SimulatedInSignal(object):
 
     def __init__(self):
-    	self.get_signal_voltage=lambda:0.0
-    	self.get_signal_current=lambda:0.0
+        self.get_signal_voltage=lambda:0.0
+        self.get_signal_current=lambda:0.0
 
     def plug_in(self,outSignal):
+        print('plugged')
         self.get_signal_voltage=outSignal.calculate_voltage_value
         self.get_signal_current=outSignal.calculate_current_value
         

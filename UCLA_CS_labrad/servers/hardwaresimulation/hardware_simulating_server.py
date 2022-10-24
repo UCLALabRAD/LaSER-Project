@@ -147,7 +147,7 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(14, 'GPIB Write', data='s', returns='')
     def gpib_write(self,c,data):
         if not c['Device']:
-            raise HSSError(1)
+            returnValue(None)
         self.reset_input_buffer(c)
         if data=='*CLS':
             pass
@@ -156,7 +156,7 @@ class CSHardwareSimulatingServer(LabradServer):
         if active_device.supports_command_chaining:
             cmds=data.split(';')
             for cmd in cmds:
-               command_interpretation=active_device.interpret_serial_command(cmd)
+               command_interpretation=yield active_device.interpret_serial_command(cmd)
                if command_interpretation or command_interpretation=="":
                    active_device.input_buffer.extend((command_interpretation+';').encode())
                else:

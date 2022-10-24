@@ -65,7 +65,6 @@ class SimulatedPiezoDevice(SerialDeviceModel):
         current_voltage=None
         if (1<= channel <= 4):
                 current_voltage=self.voltages[channel-1]
-        print("here")
         return "{:.2f}\n".format(current_voltage)
                 
                 
