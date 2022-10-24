@@ -70,7 +70,7 @@ class LaserExperiment4(QsimExperiment):
         # set up oscilloscope
         self.os_server = cxn.oscilloscope_server
         self.os_server.select_device(self.p.example_parameters.Oscilloscope_Name)
-        self.os_server.channel_toggle(self.p.example_parameters.Oscilloscope_Channel)
+        self.os_server.channel_toggle(self.p.example_parameters.Oscilloscope_Channel, True)
         # set up channel display
         self.os_server.autoscale()
         # set up measurement
@@ -119,8 +119,8 @@ class LaserExperiment4(QsimExperiment):
             # read & record oscilloscope value
             if (i % poll_value) == 0:
                 # get oscilloscope reading
-                voltage_mean = self.oscilloscope_server.measure(1, self.p.example_parameters.Oscilloscope_Channel, "MEAN")
-                voltage_frequency = self.oscilloscope_server.measure(2, self.p.example_parameters.Oscilloscope_Channel, "FREQ")
+                voltage_mean = self.oscilloscope_server.measure(1)
+                voltage_frequency = self.oscilloscope_server.measure()
                 
                 # adds the data to Data Vault
                 self.dv.add(x_point, (voltage_mean, voltage_frequency))
@@ -137,7 +137,7 @@ class LaserExperiment4(QsimExperiment):
 if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()                                  # creates LabRAD connection
-    scanner = cxn.cs_script_scanner                             # connects to script scanner server
-    exprt = LaserExperiment4(cxn=cxn)                     # instantiates the experiment
+    scanner = cxn.scriptscanner                             # connects to script scanner server
+    exprt = experiment_example(cxn=cxn)                     # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)    # registers an experiment with Script Scanner
     exprt.execute(ident)                                    # executes the experiment

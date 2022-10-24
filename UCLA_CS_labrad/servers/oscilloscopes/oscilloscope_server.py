@@ -247,7 +247,7 @@ class CSOscilloscopeServer(GPIBManagedServer):
         """
         return self.selectedDevice(c).horizontal_scale(scale)
 
-    '''
+'''
     # ACQUISITION
     @setting(201, "Trace", channel='i', points='i', save='b', returns='(*v*v)')
     def trace(self, c, channel, points, save=True):
@@ -265,7 +265,7 @@ class CSOscilloscopeServer(GPIBManagedServer):
         # save data to datavault
         if save:
             # create client-specific context
-            cntx_tmp = self.cxn.context()
+            cntx_tmp = self.client.context()
             # create folder
             trunk_tmp = createTrunk(self.name)
             self.dv.cd(trunk_tmp, True, context=cntx_tmp)
@@ -278,7 +278,7 @@ class CSOscilloscopeServer(GPIBManagedServer):
             #self.dv.add(amp_val, os_amplitude, sa_power, context=cntx_tmp)
         return data
 
-    '''
+'''
 
     # MEASURE
     @setting(210, "Measure Setup", slot='i', channel='i', param='s', returns='(iis)')
@@ -297,8 +297,8 @@ class CSOscilloscopeServer(GPIBManagedServer):
             raise Exception("Invalid measurement type. Must be one of {}.".format(str(("AMP", "FREQ", "MAX", "MEAN", "MIN", "P2P"))))
         return self.selectedDevice(c).measure_setup(slot, channel, param)
 
-    @setting(211, "Measure", slot='i', channel='i',param='s',returns='v')
-    def measure(self, c, slot,channel=0, param=None):
+    @setting(211, "Measure", slot='i', returns='v')
+    def measure(self, c, slot):
         """
         Get a measurement from a measurement slot.
         Arguments:
@@ -306,7 +306,7 @@ class CSOscilloscopeServer(GPIBManagedServer):
         Returns:
             (float): the measurement.
         """
-        return self.selectedDevice(c).measure(slot,channel,param)
+        return self.selectedDevice(c).measure(slot)
 
     @setting(221, "Measure Averaging", average_on='b', returns='b')
     def measure_averaging(self, c, average_on=None):
