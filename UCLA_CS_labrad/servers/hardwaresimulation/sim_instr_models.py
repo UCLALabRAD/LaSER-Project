@@ -60,10 +60,10 @@ class GPIBDeviceModel(object):
         
     def is_valid_cmd(self,cmd,cmd_format):
         cmd,*args=cmd.split(' ')
-        cmd_format,num_args, query_option=cmd_format
-        if not (len(args)==num_args or (query_option and len(args)==0)):
+        cmd_format,num_args=cmd_format
+        if not (len(args)==num_args):
             return False
-        if (query_option and cmd[-1]=='?'):
+        if (cmd[-1]=='?'):
             cmd=cmd[:-1]
         if not (cmd.lower()==cmd or cmd.upper()==cmd):
             return False
