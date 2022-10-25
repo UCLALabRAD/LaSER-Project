@@ -337,7 +337,7 @@ class CSSerialServer(CSPollingServer):
         if data:
             ser.baudrate=data
         resp= ser.baudrate
-        return resp
+        return int(resp)
     
     @setting(32, 'Bytesize', data=[': Query current bytesize', 'w: Set bytesize'], returns='w: Selected bytesize')
     def bytesize(self, c, data=None):
@@ -452,18 +452,17 @@ class CSSerialServer(CSPollingServer):
         # killit stops the read
         killit = False
         
-        @inlineCallbacks
         def doRead(count):
             """
             Waits until it reads <count> characters or is told to stop.
             """
             d = b''
             while not killit:
-                d = yield ser.read(count)
+                d = ser.read(count)
                 if d:
                     break
                 time.sleep(0.001)
-            returnValue(d)
+            return d
         
         # read until the timeout
         
@@ -479,29 +478,30 @@ class CSSerialServer(CSPollingServer):
             print("deferredRead timed out after {} seconds".format(elapsed))
             r = b''
         if r == b'':
-            r = yield ser.read(count)
+            r = ser.read(count)
 
         returnValue(r)
 
     @inlineCallbacks
     def readSome(self, c, count=0):
-    
+
         ser = self.getPort(c)
         if count == 0:
-            resp=yield ser.read(10000)
+            resp= ser.read(10000)
             returnValue(resp)
 
         timeout = c['Timeout']
         if timeout == 0:
-            resp=yield ser.read(count)
+            resp= ser.read(count)
             returnValue(resp)
             
 
         # read until we either hit timeout or meet character count
         recd = b''
+
         while len(recd) < count:
             # try to read remaining characters
-            r = yield ser.read(count - len(recd))
+            r = ser.read(count - len(recd))
             # if nothing, keep reading until timeout
             if r == b'':
                 r = yield self.deferredRead(ser, timeout, count - len(recd))
@@ -560,7 +560,7 @@ class CSSerialServer(CSPollingServer):
 
         recd = b''
         while True:
-            r = yield ser.read(1)
+            r = ser.read(1)
             # only try a deferred read if there is a timeout
             if r == b'' and timeout > 0:
                 r = yield self.deferredRead(ser, timeout)
@@ -570,7 +570,7 @@ class CSSerialServer(CSPollingServer):
                 break
             elif r != skip:
                 recd += r
-
+            
         returnValue(recd)
 
 
@@ -591,7 +591,7 @@ class CSSerialServer(CSPollingServer):
         """
         
         ser = self.getPort(c)
-        ser.reset_output_buffer()
+        yield ser.reset_output_buffer()
 
     @setting(63, 'Buffer Size', size='i', returns='')
     def buffer_size(self, c, size):
@@ -601,7 +601,7 @@ class CSSerialServer(CSPollingServer):
             size    (int)   : the serial buffer size.
         """
         ser=self.getPort(c)
-        ser.set_buffer_size(size)
+        yield ser.set_buffer_size(size)
 
 
     @setting(64, 'Buffer Waiting Input', returns='i')
@@ -626,8 +626,8 @@ class CSSerialServer(CSPollingServer):
         """
         
         ser = self.getPort(c)
-        val = ser.out_waiting
-        return val
+        val = yield ser.out_waiting
+        returnValue(val)
 
     @setting(71, 'Add Simulated Device', port='s', returns='')
     def add_simulated_device(self, c, port,device_type):

@@ -24,9 +24,7 @@ class SerialDeviceModel(object):
     def interpret_serial_command(self, cmd):
         cmd,*args=cmd.split(" ")
         if (cmd,len(args)) not in self.command_dict:
-            print(cmd)
-            print(len(args))
-            #raise SimulatedDeviceError(0)
+            pass
         elif not self.command_dict[(cmd,len(args))]:
             pass
         else:

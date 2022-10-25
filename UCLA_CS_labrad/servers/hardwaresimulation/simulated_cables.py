@@ -32,7 +32,6 @@ class SimulatedInSignal(object):
         self.get_signal_current=lambda:0.0
 
     def plug_in(self,outSignal):
-        print('plugged')
         self.get_signal_voltage=outSignal.calculate_voltage_value
         self.get_signal_current=outSignal.calculate_current_value
         

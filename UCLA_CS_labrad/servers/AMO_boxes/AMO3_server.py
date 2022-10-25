@@ -32,10 +32,10 @@ class AMO3Server(CSSerialDeviceServer):
 
     name = 'AMO3Server'
     regKey = 'AMO3Server'
-    default_node = 'penny CS Serial Server'
-    default_port = 'SIMpiezo'
+    default_node = None
+    default_port = None
     
-    timeout = WithUnit(3.0, 's')
+    timeout = WithUnit(10.0, 's')
     baudrate = 38400
 
 
@@ -84,12 +84,12 @@ class AMO3Server(CSSerialDeviceServer):
         if remote_status is not None:
             yield c['Serial Connection'].acquire()
             yield c['Serial Connection'].write('remote.w {:d}\r\n'.format(remote_status))
-            yield c['Serial Connection'].read_line('\n')
+            yield c['Serial Connection'].read_line()
             c['Serial Connection'].release()
         # getter
         yield c['Serial Connection'].acquire()
         yield c['Serial Connection'].write('remote.r\r\n')
-        resp = yield c['Serial Connection'].read_line('\n')
+        resp = yield c['Serial Connection'].read_line()
         c['Serial Connection'].release()
         # parse
         resp = bool(int(resp.strip()))
@@ -112,15 +112,19 @@ class AMO3Server(CSSerialDeviceServer):
         # setter
         if power is not None:
             yield c['Serial Connection'].acquire()
+            print('out.w {:d} {:d}\r\n'.format(channel, power))
             yield c['Serial Connection'].write('out.w {:d} {:d}\r\n'.format(channel, power))
-            yield c['Serial Connection'].read_line('\n')
+            yield c['Serial Connection'].read_line()
             c['Serial Connection'].release()
         # getter
         yield c['Serial Connection'].acquire()
         yield c['Serial Connection'].write('out.r {:d}\r\n'.format(channel))
-        resp = yield c['Serial Connection'].read_line('\n')
+        resp = yield c['Serial Connection'].read_line()
         c['Serial Connection'].release()
+		
         # parse
+
+
         resp = resp.strip()
         resp = bool(int(resp))
         self.notifyOtherListeners(c, (channel, resp), self.toggle_update)
@@ -146,12 +150,12 @@ class AMO3Server(CSSerialDeviceServer):
                 raise Exception("Error: voltage must be in [0, 150].")
             yield c['Serial Connection'].acquire()
             yield c['Serial Connection'].write('vout.w {:d} {:3f}\r\n'.format(channel, voltage))
-            yield c['Serial Connection'].read_line('\n')
+            yield c['Serial Connection'].read_line()
             c['Serial Connection'].release()
         # getter
         yield c['Serial Connection'].acquire()
         yield c['Serial Connection'].write('vout.r {:d}\r\n'.format(channel))
-        resp = yield c['Serial Connection'].read_line('\n')
+        resp = yield c['Serial Connection'].read_line()
         c['Serial Connection'].release()
         resp = float(resp)
         self.notifyOtherListeners(c, (channel, resp), self.voltage_update)

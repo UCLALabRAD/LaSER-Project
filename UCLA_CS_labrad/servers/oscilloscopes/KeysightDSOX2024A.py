@@ -2,6 +2,7 @@ import numpy as np
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from labrad.units import WithUnit
+from labrad.types import Value
 from labrad.gpib import GPIBDeviceWrapper
 
 
@@ -74,7 +75,7 @@ class KeysightDSOX2024AWrapper(GPIBDeviceWrapper):
         chString = ':CHAN{:d}:DISP'.format(channel)
         if state is not None:
             yield self.write(chString + ' ' + str(int(state)))
-        resp = yield self.query(chString + '?')
+        resp = yield self.query(chString + '? ')
         returnValue(bool(int(resp)))
 
     @inlineCallbacks
@@ -244,6 +245,8 @@ class KeysightDSOX2024AWrapper(GPIBDeviceWrapper):
         if slot not in (1, 2, 3, 4) or (not self.measurement_slots[slot-1]):
             raise Exception("Invalid measurement slot. Must be in [1, 4].")
         measurement_source, measurement_type=self.measurement_slots[slot-1]
+        print(measurement_source)
+        print(measurement_type)
         measure_val = yield self.query('MEAS:{:s}? CHAN{:d}'.format(measurement_type,measurement_source))
         returnValue(float(measure_val))
 

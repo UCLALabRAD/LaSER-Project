@@ -291,7 +291,6 @@ class CSGPIBBusServer(CSPollingServer):
 
     def simDeviceAdded(self, c,data):
         node, address=data
-        print("here")
         if node==self.name:
             self.sim_addresses.append(address)
             

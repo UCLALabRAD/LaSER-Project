@@ -247,7 +247,7 @@ class CSOscilloscopeServer(GPIBManagedServer):
         """
         return self.selectedDevice(c).horizontal_scale(scale)
 
-'''
+    '''
     # ACQUISITION
     @setting(201, "Trace", channel='i', points='i', save='b', returns='(*v*v)')
     def trace(self, c, channel, points, save=True):
@@ -278,7 +278,7 @@ class CSOscilloscopeServer(GPIBManagedServer):
             #self.dv.add(amp_val, os_amplitude, sa_power, context=cntx_tmp)
         return data
 
-'''
+    '''
 
     # MEASURE
     @setting(210, "Measure Setup", slot='i', channel='i', param='s', returns='(iis)')

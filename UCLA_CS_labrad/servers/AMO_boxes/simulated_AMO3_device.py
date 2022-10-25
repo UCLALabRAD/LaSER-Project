@@ -54,6 +54,7 @@ class SimulatedPiezoDevice(SerialDeviceModel):
                 return "out.w : output {} disabled\n".format(channel)
             elif status==1:
                 self.channels[channel-1].outputting=True
+                print("out.w : output {} enabled\n".format(channel))
                 return "out.w : output {} enabled\n".format(channel)
             
                     
