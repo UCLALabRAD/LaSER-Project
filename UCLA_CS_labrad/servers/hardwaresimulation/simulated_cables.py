@@ -1,4 +1,4 @@
-class SimulatedOutSignal(object):
+/class SimulatedOutSignal(object):
     
     def __init__(self,dev,channel):
         self.dev=dev
@@ -40,7 +40,7 @@ class SimulatedPiezoPMTSignal(SimulatedOutSignal):
 class SignalLog(object):
     def __init__(self):
         self.log=[]
-        self.record_length=None
+        self.points_in_record_count=None
         self.cable_connected=False
         #self.lock needed???
         
@@ -64,7 +64,7 @@ class SignalLog(object):
             pass
         else:
             self.log=self.log[last_record_starting_before_window:]
-            self.log[0].time=current_time-self.record_length
+        
             
     
     def erase_log(self):
@@ -99,7 +99,16 @@ class SimulatedInSignal(object):
         for start_time, func in self.input_signal_log.log:
             
            
-        
+    def generate_waveform(self,window_start,window_end, memory_length, log):
+        x_vals=np.linspace(window_start,window_end,memory_length)
+        split_points=[rec[0] for rec in log]
+        split_indices=np.searchsorted(x_vals,split_points,'left')
+        func_app_list=np.array_split(x_vals,split_indices)
+        waveform=[]
+        for func,arr in zip([rec.func for rec in log],func_app_list):
+            waveform.extend(func(arr))
+    
+        return waveform
 
     @property
     def incoming_current(self):

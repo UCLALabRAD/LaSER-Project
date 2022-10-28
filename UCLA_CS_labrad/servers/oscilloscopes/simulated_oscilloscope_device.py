@@ -20,10 +20,10 @@ class SimulatedKeysightDSOXADevice(GPIBDeviceModel):
         self.supports_command_chaining=True
         self.id_string='AGILENT TECHNOLOGIES,DSO-X 2024A,MY58104761,02.43.2018020635'
         self.command_dict={
-        (":MEAS:VAV?",1) : self.measure_average,
-        (":MEAS:FREQ?",1) : self.measure_frequency,
-        (":AUT",0) : self.autoscale,
-        (":TOGG",2) : self.toggle_channel,
+        (b':MEAS:VAV?',1) : self.measure_average,
+        (b':MEAS:FREQ?',1) : self.measure_frequency,
+        (b':AUT',0) : self.autoscale,
+        (b':TOGG',2) : self.toggle_channel,
         (":TOGG?",1) : self.toggle_channel
         }
         self.current_horizontal_scale=.01
@@ -35,7 +35,6 @@ class SimulatedKeysightDSOXADevice(GPIBDeviceModel):
         self.channel_toggled_on=[False]*4
         for i in range(4):
             self.channels.append(SimulatedInSignal())
-            self.samplers.append(self.ThreadSampler(self.channels[i],self.sample_storage[i]))
             
     def toggle_channel(self,channel,val=None):
         if val:
@@ -84,37 +83,6 @@ class SimulatedKeysightDSOXADevice(GPIBDeviceModel):
     def autoscale(self):
     #change scales,trigger, positions
         return "nice"
-    
-    
-    class ReactorSampler(object):
-        def __init__(self,channel,sample_storage):
-            self.current_sample=0
-            self.looping_call=LoopingCall(self.sample_voltage)
-            self.sample_storage=sample_storage
-            self.channel=channel
-        def sample_voltage(self):
-            self.sample_storage[self.current_sample]=self.channel.incoming_voltage
-            self.current_sample=self.current_sample+1
-            if self.current_sample>=len(self.sample_storage):
-                self.current_sample=0
-                self.looping_call.stop()
-                
-        @inlineCallbacks
-        def capture(self,sampling_period):
-            yield self.looping_call.start(sampling_period)
-            
-    class ThreadSampler(object):
-        def __init__(self,channel,sample_storage):
-            self.sample_storage=sample_storage
-            self.channel=channel
-        def collect_voltage_data(self,sample_period):
-            for i in range(len(self.sample_storage)):
-                self.sample_storage[i]=self.channel.incoming_voltage
-                time.sleep(sample_period)
-        @inlineCallbacks
-        def capture(self,sample_period):
-            yield deferToThread(self.collect_voltage_data,sample_period)
-            
     
     
     
