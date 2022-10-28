@@ -56,19 +56,20 @@ class CSSerialServer(CSPollingServer):
         active_device_connections=[]
         def __init__(self, hss, node, port,context):
         
-            self.port=port
+            self.name="SIMCOM"+str(port)
             
             self.ctxt=context
          
             self.ser=hss
+            
+            self.input_buffer=bytearray()
         
-            self.name="Simulated Serial Device at Node "+ node +", Port "+ self.port
             
             self.timeout=0
             
             self.is_broken=False
         
-            self.open= lambda: self.ser.select_device(node, self.port, context=self.ctxt)
+            self.open= lambda: self.ser.select_device(node, int(self.name[-1]), context=self.ctxt)
             
             if self.port in self.active_device_connections:
                 raise Error()
@@ -80,13 +81,16 @@ class CSSerialServer(CSPollingServer):
                 self.open()
                 
             
-      
+            self.buff_lock=DeferredLock()
             
-            self.reset_input_buffer= lambda: self.ser.reset_input_buffer(context=self.ctxt)
+        
             self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
             
             
             self.set_buffer_size= lambda size: None
+          
+        def self.reset_input_buffer(self):
+            self.input_buffer=bytearray()
             
         def break_connection(self):
             if self.port in self.active_device_connections:
@@ -109,15 +113,23 @@ class CSSerialServer(CSPollingServer):
         def out_waiting(self):
             return self.ser.get_out_waiting(context=self.ctxt)
             
-        @inlineCallbacks
+
         def read(self,bytes):
-            resp= yield self.ser.serial_read(bytes,context=self.ctxt)
-            returnValue(resp.encode())
+            yield buff_lock.acquire()
+            resp,rest=self.input_buffer[:bytes],self.input_buffer[bytes:]
+            self.input_buffer=rest
+            buff_lock.release()
+            return resp
         
                 
         def write(self,data):
-            return self.ser.serial_write(data,context=self.ctxt)
+            d= self.ser.query(data,context=self.ctxt)
+            d.addCallback(self.addtoBuffer)
 
+        def addtoBuffer(self,data):
+            yield buff_lock.acquire()
+            self.input_buffer.extend(data)
+            buff_lock.release()
 
         @property
         def baudrate(self):
@@ -231,14 +243,14 @@ class CSSerialServer(CSPollingServer):
                 _, _, dev_name = dev_path.rpartition(os.sep)
                 self.SerialPorts.append(SerialDevice(dev_name,dev_path,None))
             
-        for dev in self.sim_dev_list:
+        for port in self.occupied_sim_port_list:
             try:
-                ser = self.DeviceConnection(None,self.name,dev,None)
+                ser = self.DeviceConnection(None,self.name,port,None)
                 ser.close()
             except:
                 pass
             else:
-                self.SerialPorts.append(SerialDevice(dev,None,self.HSS))
+                self.SerialPorts.append(SerialDevice(port,None,self.HSS))
                 
 
         port_list_tmp = [x.name for x in self.SerialPorts]
@@ -629,12 +641,12 @@ class CSSerialServer(CSPollingServer):
         val = yield ser.out_waiting
         returnValue(val)
 
-    @setting(71, 'Add Simulated Device', port='s', returns='')
+    @setting(71, 'Add Simulated Device', port='i', device_type='s',returns='')
     def add_simulated_device(self, c, port,device_type):
         if self.HSS:
             yield self.HSS.add_device(self.name,port,device_type,False)
         
-    @setting(72, 'Remove Simulated Device', port='s', returns='')
+    @setting(72, 'Remove Simulated Device', port='i', returns='')
     def remove_simulated_device(self, c, port):
         if self.HSS:
             yield self.HSS.remove_device(self.name,port)

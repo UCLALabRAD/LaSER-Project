@@ -33,7 +33,7 @@ from labrad import auth, protocol, util, types as T, constants as C
 STATUS_TYPE = '*(s{name} s{desc} s{ver})'
 
 class HSSError(Exception):
-    errorDict ={ 0:'Device already exists at specified node and port',1:'No device exists at specified node and port',2: 'Device type not supported.',3: 'No directories for Simulated Device files found in registry',4:'One or more simulated device info blocks were not successfully parsed in directory.', 5:'Unable to find class for desired device in module'}
+    errorDict ={ 0:'Device already exists at specified node and address',1:'No device exists at specified node and address',2: 'Device type not supaddressed.',3: 'No directories for Simulated Device files found in registry',4:'One or more simulated device info blocks were not successfully parsed in directory.', 5:'Unable to find class for desired device in module'}
 
     def __init__(self, code):
         self.code = code
@@ -43,7 +43,7 @@ class HSSError(Exception):
             return self.errorDict[self.code]
             
 class SimulatedDeviceError(Exception):
-    errorDict ={0:'Serial command not supported by device.', 1: 'Unsupported Value for Serial Connection Parameter'}
+    errorDict ={0:'Serial command not supaddressed by device.', 1: 'Unsupaddressed Value for Serial Connection Parameter'}
 
     def __init__(self, code):
         self.code = code
@@ -57,6 +57,7 @@ SimInstrModel = collections.namedtuple('SimInstrModel', ['name','version','descr
         
 # DEVICE CLASS
 class CSHardwareSimulatingServer(LabradServer):
+
     name='CS Hardware Simulating Server'
     device_added=Signal(565656,'Signal: Device Added','(s,s)')
     device_removed=Signal(676767,'Signal: Device Removed','(s,s)')
@@ -87,7 +88,7 @@ class CSHardwareSimulatingServer(LabradServer):
                 
                 # gets the experiment class from the module
                 cls = getattr(module, class_name)
-            except ImportError as e:
+            except importError as e:
                 print('Error importing simulated device model:', e)
             except AttributeError as e:
                 print(e)
@@ -109,124 +110,87 @@ class CSHardwareSimulatingServer(LabradServer):
                 else:
                     self.sim_instr_models[name] = SimInstrModel(name,version,description,cls)
                     
-    @setting(11, 'Serial Read', count='i', returns='s')
-    def serial_read(self,c,count):
-        if not c['Device']:
-            raise HSSError(1)
-        active_device=c['Device']
-        write_out,rest=active_device.input_buffer[:count],active_device.input_buffer[count:]
-        active_device.input_buffer=rest
-        return write_out.decode()
+
 
     
-    @setting(12, 'Serial Write', data='s', returns='')
-    def serial_write(self,c,data):
-        if not c['Device']:
-            raise HSSError(1)
-        active_device=c['Device']
-        active_device.output_buffer.extend(data.encode())
-        *cmds, rest=active_device.output_buffer.decode().split('\r\n')
-        for cmd in cmds:
-            command_interpretation=active_device.interpret_serial_command(cmd)
-            active_device.input_buffer.extend(command_interpretation.encode())
-                
-        active_device.output_buffer=bytearray(rest.encode())
-    
-   
-    @setting(13, 'GPIB Read', count='i', returns='s')
-    def gpib_read(self,c,count=None):
-        if not c['Device']:
-            raise HSSError(1)
-        active_device=c['Device']
-        if not count:
-           count=len(active_device.input_buffer)
-        write_out,rest=active_device.input_buffer[:count],active_device.input_buffer[count:]
-        active_device.input_buffer=rest
-        return write_out.decode()
 
-    @setting(14, 'GPIB Write', data='s', returns='')
-    def gpib_write(self,c,data):
+        
+        
+
+    @setting(14, 'Simulated Write', data='s', returns='')
+    def simulated_write(self,c,data):
         if not c['Device']:
             returnValue(None)
-        self.reset_input_buffer(c)
-        if data=='*CLS':
-            pass
         active_device=c['Device']
-        invalid_command_entered=False
-        if active_device.supports_command_chaining:
-            cmds=data.split(';')
-            for cmd in cmds:
-               command_interpretation=yield active_device.interpret_serial_command(cmd)
-               if command_interpretation or command_interpretation=="":
-                   active_device.input_buffer.extend((command_interpretation+';').encode())
-               else:
-                   invalid_command_entered=True
-                   break
-        if active_device.input_buffer:
-            active_device.input_buffer=active_device.input_buffer[:-1]
-            if not invalid_command_entered:
-                active_device.input_buffer.extend(active_device.termination_character.encode())
-            
+        active_device.write()
+        resp=yield active_device.read()
+        returnValue(resp)
         
-    
-    @setting(31, 'Add Device', node='s',port='s', instr_model='s',is_gpib='b',returns='')
-    def add_device(self, c, node, port,instr_model,is_gpib):
-        if (node,port) in self.devices:
+
+        
+    @setting(31, 'Add Device', node='s',address='s', instr_model='s',is_gpib='b',returns='')
+    def add_device(self, c, node, address,instr_model,is_gpib):
+        if (node,address) in self.devices:
             raise HSSError(0)
-    
         if instr_model not in self.sim_instr_models or (issubclass(self.sim_instr_models[instr_model].cls,GPIBDeviceModel))!=is_gpib:
             raise HSSError(2)
-        self.devices[(node,port)]=self.sim_instr_models[instr_model].cls()
-        self.device_added((node,port))
+            
+        if issubclass(self.sim_instr_models[instr_model].cls,GPIBDeviceModel)):
+            self.devices[(node,address)]=GPIBDeviceCommInterface(self.sim_instr_models[instr_model].cls())
+        else:
+            self.devices[(node,address)]=SerialDeviceCommInterface(self.sim_instr_models[instr_model].cls())
+        self.device_added((node,address))
         
         
         
         
-    @setting(32, 'Remove Device', node='s', port='s', returns='')
-    def remove_device(self,c, node, port):
-        if (node,port) not in self.devices: 
+    @setting(32, 'Remove Device', node='s', address='s', returns='')
+    def remove_device(self,c, node, address):
+        if (node,address) not in self.devices:
             raise HSSError(1)
         
         for context_obj in self.contexts.values():
-            if context_obj.data['Device'] is self.devices[(node,port)]:
+            if context_obj.data['Device'] is self.devices[(node,address)]:
                 context_obj.data['Device']=None
                 break
-        del self.devices[(node,port)]
+        del self.devices[(node,address)]
         
-        self.device_removed((node,port))
+        self.device_removed((node,address))
     
     @setting(41, 'Get In-Waiting', returns='i')
     def get_in_waiting(self,c):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
-        return len(active_device.input_buffer)
+        return active_device.in_waiting
     
     @setting(42, 'Get Out-Waiting', returns='i')
     def get_out_waiting(self,c):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
-        return len(active_device.output_buffer)
+        return active_device.out_waiting
     
     
-    @setting(51, 'Reset Input Buffer', returns='')
+    @setting(51, 'Reset Device Input Buffer', returns='')
     def reset_input_buffer(self,c):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
-        active_device.input_buffer=bytearray(b'')
-    
-    @setting(52, 'Reset Output Buffer', returns='')
+        active_device.reset_input_buffer()
+        
+        
+    @setting(52, 'Reset Device Output Buffer', returns='')
     def reset_output_buffer(self,c):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
-        active_device.output_buffer=bytearray(b'')
-
-    @setting(61, 'Select Device', node='s', port='s', returns='')
-    def select_device(self,c,node,port):
-        c['Device']=self.devices[(node,port)]
+        active_device.reset_output_buffer()
+        
+        
+    @setting(61, 'Select Device', node='s', address='s', returns='')
+    def select_device(self,c,node,address):
+        c['Device']=self.devices[(node,address)]
 
       
     @setting(62, 'Deselect Device',returns='')
@@ -238,83 +202,66 @@ class CSHardwareSimulatingServer(LabradServer):
     def baudrate(self,c,val):
         active_device=c['Device']
         if val:
-            if active_device.required_baudrate and val!=active_device.required_baudrate:
-                raise SimulatedDeviceError(1)
-            else:
-                active_device.actual_baudrate=val
-        return active_device.actual_baudrate
+            active_device.comm_baudrate=val
+        return active_device.comm_baudrate
         
     @setting(72, 'Bytesize',val=[': Query current stopbits', 'w: Set bytesize'], returns='w: Selected bytesize')
     def bytesize(self,c,val):
         active_device=c['Device']
         if val:
-            if active_device.required_bytesize and val!=active_device.required_bytesize:
-                raise SimulatedDeviceError(1)
-            else:
-                active_device.actual_bytesize=val
-        return active_device.actual_bytesize
+            active_device.comm_bytesize=val
+        return active_device.comm_bytesize
         
     @setting(73, 'Parity', val=[': Query current parity', 'w: Set parity'], returns='w: Selected parity')
     def parity(self,c,val):
         active_device=c['Device']
         if val:
-            if active_device.required_parity and val!=active_device.required_parity:
-                raise SimulatedDeviceError(1)
-            else:
-                active_device.actual_parity=val
-        return active_device.actual_parity
+            active_device.comm_parity=val
+        return active_device.comm_parity
         
     @setting(74, 'Stopbits', val=[': Query current stopbits', 'w: Set stopbits'], returns='w: Selected stopbits')
     def stopbits(self,c,val):
         active_device=c['Device']
         if val:
-            if active_device.required_stopbits and val!=active_device.required_stopbits:
-                raise SimulatedDeviceError(1)
-            else:
-                active_device.actual_stopbits=val
-        return active_device.actual_stopbits
+            active_device.comm_stopbits=val
+        return active_device.comm_stopbits
         
     @setting(75, 'RTS', val='b', returns='b')
     def rts(self,c,val):
         active_device=c['Device']
         if val:
-            if active_device.required_rts and val!=active_device.required_rts:
-                raise SimulatedDeviceError(1)
-            else:
-                active_device.actual_rts=val
-        return active_device.actual_rts
+            active_device.comm_rts=val
+        return active_device.comm_rts
         
     @setting(76, 'DTR', val='b', returns='b')
     def dtr(self,c,val):
         active_device=c['Device']
         if val:
-            if active_device.required_dtr and val!=active_device.required_dtr:
-                raise SimulatedDeviceError(1)
-            else:
-                active_device.actual_dtr=val
-        return active_device.actual_dtr
+            active_device.comm_dtr=val
+        return active_device.comm_dtr
         
-    @setting(81, 'Buffer Size', returns='')
-    def buffer_size(self,c):
+    @setting(81, 'Buffer Size',returns='')
+    def buffer_size(self,c,size):
         if not c['Device']:
             raise HSSError(1)
-        return 0
+        active_device=c['Device']
+        active_device.buffer_size=size
+        return active_device.buffer_size
         
       
-    @setting(92, 'Get Device Types',returns='s')
-    def available_device_types(self, c):
-        """Get information about all servers on this node."""
-        return "Serial Devices:\n" + "\n\n".join(["Name: "+model.name +"\nVersion: " + model.version+ "\nDescription: " +model.description for model in self.sim_instr_models.values() if not (issubclass(model.cls,GPIBDeviceModel))]) + "\n\n" +"GPIB Devices:\n" + "\n\n".join(["Name: "+model.name +"\nVersion: " + model.version+ "\nDescription: " +model.description for model in self.sim_instr_models.values() if (issubclass(model.cls,GPIBDeviceModel))])
+    @setting(92, 'Get Available Device Types',returns='*(ssb)')
+    def get_available_device_types(self, c):
+        return [(model.name +' v'+model.version, model.description, (issubclass(model.cls,GPIBDeviceModel))) for model in self.sim_instr_models.values()]
 
     @setting(100, "Reload Available Device Types")
     def reload_available_scripts(self, c):
         reload(hss_config)
         self.load_scripts()
         
-    @setting(110, "Add Simulated Wire",out_node='s',out_port='s',out_channel='i',in_node='s',in_port='s',in_channel='i')
-    def add_simulated_wire(self,c,out_node,out_port,out_channel,in_node,in_port,in_channel):
-        out_dev=(out_node,out_port)
-        in_dev=(in_node,in_port)
+    @setting(110, "Add Simulated Wire",out_node='s',out_address='s',out_channel='i',in_node='s',in_address='s',in_channel='i')
+    def add_simulated_wire(self,c,out_node,out_address,out_channel,in_node,in_address,in_channel):
+        out_dev=(out_node,out_address)
+        in_dev=(in_node,in_address)
         #if out_dev not in self.devices or in_dev not in self.devices:
         #raise HSSError(1)
        # try:
@@ -323,33 +270,44 @@ class CSHardwareSimulatingServer(LabradServer):
         in_conn.plug_in(out_conn)
        # except:
             #raise HSSError(1)
+            
+        
            
     
-    @setting(111, "Remove Simulated Wire",in_node='s',in_port='s',in_channel='i')
-    def remove_simulated_wire(self,c,in_node,in_port,in_channel):
-        in_dev=(in_node,in_port)
+    @setting(111, "Remove Simulated Wire",in_node='s',in_address='s',in_channel='i')
+    def remove_simulated_wire(self,c,in_node,in_address,in_channel):
+        in_dev=(in_node,in_address)
         #try:
         in_conn=self.devices[in_dev].channels[in_channel-1]
         in_conn.unplug()
         #except:
             #raise HSSError(1)
             
-            
+    @setting(121, "List Buses",returns='*s')
+    def list_buses(self,c):
+        return set([loc[0] for loc in self.devices])
+        
+    @setting(122, "List Devices", bus='s', returns='*(iss)')
+    def list_devices(self,c,bus):
+        return [(loc[1],dev.name,dev.description) for loc,dev in self.devices.items() if loc[0]==bus]
+        
+    
+    
     def serverConnected(self, ID, name):
         """
         Attempt to connect to last connected serial bus server upon server connection.
         """
-        # check if we aren't connected to a device, port and node are fully specified,
+        # check if we aren't connected to a device, address and node are fully specified,
         # and connected server is the required serial bus server
-        for node, port in self.devices.keys():
+        for node, address in self.devices.keys():
             if name==node:
-               self.device_added((node,port))
+               self.device_added((node,address))
                break
                     
         
 
-        
-       
+
+    #list simulated cables
 
 __server__ = CSHardwareSimulatingServer()
 

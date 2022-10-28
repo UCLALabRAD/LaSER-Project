@@ -1,47 +1,105 @@
 class SimulatedOutSignal(object):
+    
     def __init__(self,dev,channel):
         self.dev=dev
         self.channel=channel
-        self.outputting=False
+        self.currently_outputting=False
+        self.signal_log=SignalLog()
+        self.current_signal_function=None
 
-    def calculate_voltage_value(self):
+    def calculate_signal_function(self):
         return None
 
-    def calculate_current_value(self):
-        return None
+    def update_signal_function(self):
+        self.current_signal_function=self.calculate_signal_function()
+        if self.currently_outputting:
+            self.signal_log.update((self.current_signal_function))
+
+    @property
+    def outputting(self,val):
+        was_outputting=self.currently_outputting
+        self.currently_outputting=val
+        if self.currently_outputting!=was_outputting:
+            if self.currently_outputting:
+                self.signal_log.update(self.current_signal_function)
+            else:
+                self.signal_log.update(None,time.time())
+            
+
+class SimulatedPiezoPMTSignal(SimulatedOutSignal):
+    def generate_constant_signal_func(self,voltage):
+        return (lambda times: np.full(len(times),voltage))
+        
+    def calculate_signal_function(self):
+        return self.generate_constant_signal_func(self.dev.channels[self.channel-1])
+    
+    
         
     
     
-
-
-class SimulatedPiezoPMTSignal(SimulatedOutSignal):
-    def __init__(self,dev,channel):
-        super().__init__(dev,channel)
-    
-    def calculate_voltage_value(self):
-        if self.outputting:
-            return self.dev.voltages[self.channel-1]
+class SignalLog(object):
+    def __init__(self):
+        self.log=[]
+        self.record_length=None
+        self.cable_connected=False
+        #self.lock needed???
+        
+    def update(self, new_func):
+        if not self.cable_connected:
+            return
+        current_time=time.time()
+        self.log.append((new_func,current_time))
+        self.clip_record()
+        
+    def clip_record(self):
+        first_record_starting_in_window=len(self.log)-1
+        
+        for i in len(self.log):
+            if self.log[i].time>(current_time-self.record_length):
+                first_record_starting_in_window=i
+                    break
+        
+        last_record_starting_before_window=first_record_starting_in_window-1
+        if last_record_starting_before_window<0:
+            pass
         else:
-            return 0.0
+            self.log=self.log[last_record_starting_before_window:]
+            self.log[0].time=current_time-self.record_length
+            
+    
+    def erase_log(self):
+        self.log=[]
+
+
+
 
 
 class SimulatedInSignal(object):
 
     def __init__(self):
-        self.get_signal_voltage=lambda:0.0
-        self.get_signal_current=lambda:0.0
+        self.input_signal_log=None
+
 
     def plug_in(self,outSignal):
-        self.get_signal_voltage=outSignal.calculate_voltage_value
-        self.get_signal_current=outSignal.calculate_current_value
+        self.input_signal_log=outSignal.output_signal_log
+        self.input_signal_log.cable_connected=True
+        outSignal.update_signal_function()
+        
+        
+        
         
     def unplug(self):
-        self.get_signal_voltage=lambda:0.0
-        self.get_signal_current=lambda:0.0
+        self.input_signal_log.erase_log()
+        self.input_signal_log.cable_connected=False
+        self.input_signal_log=None
+        
 
-    @property
-    def incoming_voltage(self):
-        return self.get_signal_voltage()
+    def generate_waveform(self)
+        
+        for start_time, func in self.input_signal_log.log:
+            
+           
+        
 
     @property
     def incoming_current(self):

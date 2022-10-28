@@ -51,11 +51,11 @@ class SimulatedPiezoDevice(SerialDeviceModel):
             channel=int(channel)
             if status==0:
                 self.channels[channel-1].outputting=False
-                return "out.w : output {} disabled\n".format(channel)
+                return "out.w : output {} disabled".format(channel)
             elif status==1:
                 self.channels[channel-1].outputting=True
-                print("out.w : output {} enabled\n".format(channel))
-                return "out.w : output {} enabled\n".format(channel)
+                print("out.w : output {} enabled".format(channel))
+                return "out.w : output {} enabled".format(channel)
             
                     
                         
@@ -66,7 +66,7 @@ class SimulatedPiezoDevice(SerialDeviceModel):
         current_voltage=None
         if (1<= channel <= 4):
                 current_voltage=self.voltages[channel-1]
-        return "{:.2f}\n".format(current_voltage)
+        return "{:.2f}".format(current_voltage)
                 
                 
     def set_channel_voltage(self,channel,voltage):
@@ -79,5 +79,5 @@ class SimulatedPiezoDevice(SerialDeviceModel):
         if (1<= channel <= 4):
             self.voltages[channel-1]=voltage
 
-        return "vout.w : set output {} to {:.3f}\n".format(channel,voltage)
+        return "vout.w : set output {} to {:.3f}".format(channel,voltage)
 		
