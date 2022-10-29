@@ -1,4 +1,4 @@
-/class SimulatedOutSignal(object):
+class SimulatedOutSignal(object):
     
     def __init__(self,dev,channel):
         self.dev=dev
@@ -40,12 +40,11 @@ class SimulatedPiezoPMTSignal(SimulatedOutSignal):
 class SignalLog(object):
     def __init__(self):
         self.log=[]
-        self.points_in_record_count=None
-        self.cable_connected=False
+        self.record_time_length=None
         #self.lock needed???
         
     def update(self, new_func):
-        if not self.cable_connected:
+        if not self.record_time_length:
             return
         current_time=time.time()
         self.log.append((new_func,current_time))
@@ -55,7 +54,7 @@ class SignalLog(object):
         first_record_starting_in_window=len(self.log)-1
         
         for i in len(self.log):
-            if self.log[i].time>(current_time-self.record_length):
+            if self.log[i].time>(current_time-self.record_time_length):
                 first_record_starting_in_window=i
                     break
         
@@ -76,40 +75,45 @@ class SignalLog(object):
 
 class SimulatedInSignal(object):
 
-    def __init__(self):
+    def __init__(self,record_time_length,points_in_memory):
         self.input_signal_log=None
-
+        self.is_on=False
+        self.record_time_length=record_time_length
 
     def plug_in(self,outSignal):
         self.input_signal_log=outSignal.output_signal_log
-        self.input_signal_log.cable_connected=True
+        self.input_signal_log.record_time_length=self.record_time_length
         outSignal.update_signal_function()
         
         
         
         
     def unplug(self):
+        self.input_signal_log.record_time_length=None
         self.input_signal_log.erase_log()
-        self.input_signal_log.cable_connected=False
         self.input_signal_log=None
         
-
-    def generate_waveform(self)
-        
-        for start_time, func in self.input_signal_log.log:
             
            
-    def generate_waveform(self,window_start,window_end, memory_length, log):
+    def generate_waveform(self,horiz_scale,horiz_pos, vert_scale,vert_pos):
+        if not self.is_on:
+            return None
+        window_horiz_start=horiz_pos-(horiz_scale*5)
+        window_horiz_end=horiz_pos+(horiz_scale*5)
+        window_vert_start=
+        window_vert_end=
+        current_time=time.time()
+        record_start_time=current_time-self.record_time_length
+        if self.input_signal_log[0].start_time > record_start_time:
+            #hasnt been running long enough
+        record=[((self.input_signal_log[i].start_time-record_start_time),self.input_signal_log[i].func) for i in range(len(self.input_signal_log))]
+        
         x_vals=np.linspace(window_start,window_end,memory_length)
-        split_points=[rec[0] for rec in log]
+        split_points=[rec.start_time for rec in log]
         split_indices=np.searchsorted(x_vals,split_points,'left')
         func_app_list=np.array_split(x_vals,split_indices)
         waveform=[]
-        for func,arr in zip([rec.func for rec in log],func_app_list):
-            waveform.extend(func(arr))
+        for record,arr in zip(rec,func_app_list):
+            waveform.extend(record.func(arr-record_start_time).clip(window_vert_start,window_vert_end))
     
         return waveform
-
-    @property
-    def incoming_current(self):
-        return self.get_signal_current()

@@ -139,7 +139,7 @@ class SerialDeviceCommInterface(DeviceCommInterface):
 class GPIBDeviceCommInterface(object):
     
     input_termination_char=b':;'
-    output_termination_char=b'\n'
+    output_termination_char=b';'
     id_string=None
     
         
@@ -240,33 +240,24 @@ class GPIBDeviceCommInterface(object):
                 if (self.check_if_scpi_match(cmd,cmd_specs)):
                     _,args_list=cmd.split(b' ')
                     args=args_list.split(b',')
-                    if not func: #debug mode: give error
+                    if not func:
                             return b''
                     if is_query:
                         resp= func(*args)
                         if resp:
                             return resp
                         else:
-                             
-                            return b''
-                            #debug: give error if nothing returned
+                            #error
                     
                     else:
                         func(*args)
                         return b''
+            #error
+            
         
         
     def read(self):
-        *chained_cmds, rest=self.dev.input_buffer.split(self.input_termination_byte)
-        for chained_cmd in chained_cmds:
-            expanded_commands=self.expand_chained_commands(chained_cmd)
-            for cmd in expanded_commands:
-                command_interpretation= self.dev.interpret_serial_command(cmd)
-                if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
-                    self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
-                    #error
-                self.output_buffer.extend(command_interpretation.encode())
-        resp=self.output_buffer.decode()
+        resp=self.output_buffer.decode()+'\n'
         return resp
         
     
@@ -278,7 +269,30 @@ class GPIBDeviceCommInterface(object):
             #buffer overflow error
         else:
             self.input_buffer.extend(data)
+        self.process_commands() #should this be on read side? or deferred to a thread?
     
+    def process_commands(self):
+        *chained_cmds, rest=self.dev.input_buffer.split(self.input_termination_byte)
+        expanded_commands=[]
+        for chained_cmd in chained_cmds:
+            expanded_commands.extend(self.expand_chained_commands(chained_cmd))
+        for cmd in expanded_commands:
+            try:
+                command_interpretation= self.dev.interpret_serial_command(cmd)
+                #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
+                    #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
+                    #error
+            except:
+                self.output_buffer=bytearray(b'')
+                #if debug mode, error
+                break
+            
+            else:
+                self.output_buffer.extend(command_interpretation+output_termination_char)
+
+                
+                
+            
     
     
     
