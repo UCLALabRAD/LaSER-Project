@@ -7,13 +7,15 @@ class DeviceCommInterface(object):
     output_termination_char=None
     id_command=None
     id_string=None
+    max_buffer_size=None
+    
     def __init__(self,dev,conn):
         self.input_buffer=bytearray(b'')
+        self.output_buffer=bytearray(b'')
         self.dev=dev
-        self.buffer_size=1000
-        self.conn=conn
+
     
-    @inlineCallbacks
+ 
     def read(self):
         pass
         
@@ -21,7 +23,6 @@ class DeviceCommInterface(object):
     def write(self):
         pass
         
-    @inlineCallbacks
     def interpret_serial_command(self):
         pass
         
@@ -102,32 +103,55 @@ class SerialDeviceCommInterface(DeviceCommInterface):
     
     def interpret_serial_command(self, cmd):
         body,*args=cmd.split(b' ')
-        if (body,len(args)) not in self.dev.command_dict:
-            pass #error
-        elif not self.dev.command_dict[(body,len(args))]:
-            pass
-        else:
-            resp= yield self.dev.command_dict[body,len(args))](*args)
-            return resp
+        for (spec_body,arg_counts),func in self.dev.command_dict.items():
+            if type(arg_counts)==str:
+                arg_counts=[arg_counts]
+            if body==spec_body and len(args) in arg_counts:
+                if func:
+                    resp=func(*args)
+                else:
+                    return bytearray(b'')
+                
+        #Error if in debug mode?
+        return bytearray(b'')
     
-    @inlineCallbacks
-    def read(self):
-        *cmds, rest=self.dev.input_buffer.split(self.input_termination_byte)
-        for cmd in cmds:
-            command_interpretation=yield self.dev.interpret_serial_command(cmd)
-            if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
-                    self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
-            self.output_buffer.extend(command_interpretation.encode())
-        resp=self.output_buffer.decode()
+
+    def read(self,count=None):
+        resp=None
+        if count:
+            resp,rest=self.output_buffer[:count],self.output_buffer[count:]
+            self.output_buffer=self.output_buffer[count:]
+        else:
+            resp=self.output_buffer
+            self.output_buffer=bytearray(b'')
+            
         return resp
         
     
     def write(self,data):
         if len(self.input_buffer)+len(data)>self.max_buffer_size:
-            self.input_buffer.extend(data.encode()[:(self.max_buffer_size-len(self.input_buffer))])
+            self.input_buffer.extend(data[:(self.max_buffer_size-len(self.input_buffer))])
             #buffer overflow error
-        self.input_buffer.extend(data.encode())
+        else:
+            self.input_buffer.extend(data)
         self.enforce_correct_communication_parameters()
+        self.process_commands()
+        
+    def process_commands(self):
+        *cmds, rest=self.dev.input_buffer.split(self.input_termination_byte)
+        for cmd in cmds:
+            try:
+                command_interpretation= self.interpret_serial_command(cmd)
+                #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
+                    #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
+                    #error
+            except:
+                #if debug mode, error
+                break
+            
+            else:
+                self.output_buffer.extend(command_interpretation+output_termination_char)
+        
 
         
  
@@ -165,13 +189,13 @@ class GPIBDeviceCommInterface(object):
         cmd=str(cmd)
         cmd_scpi_format=str(cmd_scpi_format)
        
-        body,args_list=cmd.split(' ')
-        args=args_list.split(',')
-        if body[-1]=='?' and body_format[-1]=='?':
+        body,args_list=cmd.split(b' ')
+        args=args_list.split(b',')
+        if body[-1]=='?' and body_format[-1]==b'?':
             body=body[:-1]
             body_format=body_format[:-1]
         body_format,arg_nums=cmd_format
-        body_format.replace('[:',':[')
+        body_format.replace(b'[:',':[')
         
         if type(arg_nums)==str:
             arg_nums=[arg_nums]
@@ -256,8 +280,15 @@ class GPIBDeviceCommInterface(object):
             
         
         
-    def read(self):
-        resp=self.output_buffer.decode()+'\n'
+    def read(self,count=None):
+        resp=None
+        if count:
+            resp,rest=self.output_buffer[:count],self.output_buffer[count:]
+            self.output_buffer=self.output_buffer[count:]
+        else:
+            resp=self.output_buffer
+            self.output_buffer=bytearray(b'')
+            
         return resp
         
     
@@ -269,16 +300,19 @@ class GPIBDeviceCommInterface(object):
             #buffer overflow error
         else:
             self.input_buffer.extend(data)
-        self.process_commands() #should this be on read side? or deferred to a thread?
+        self.process_commands()
+            
+        
     
     def process_commands(self):
+        self.output_buffer=bytearray(b'')
         *chained_cmds, rest=self.dev.input_buffer.split(self.input_termination_byte)
         expanded_commands=[]
         for chained_cmd in chained_cmds:
             expanded_commands.extend(self.expand_chained_commands(chained_cmd))
         for cmd in expanded_commands:
             try:
-                command_interpretation= self.dev.interpret_serial_command(cmd)
+                command_interpretation= self.interpret_serial_command(cmd)
                 #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
                     #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
                     #error
@@ -289,6 +323,8 @@ class GPIBDeviceCommInterface(object):
             
             else:
                 self.output_buffer.extend(command_interpretation+output_termination_char)
+        if self.output_buffer:
+            self.output_buffer.append(b'\n')
 
                 
                 

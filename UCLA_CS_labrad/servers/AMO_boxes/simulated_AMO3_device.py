@@ -6,36 +6,43 @@ from UCLA_CS_labrad.servers.hardwaresimulation.simulated_cables import Simulated
 
 __all__=['SimulatedPiezoDevice']
 
-class SimulatedPiezoDevice(SerialDeviceModel):
 
-    name= 'AMO3'
-    version = '1.0'
-    description='test piezo'
+class SimulatedPiezo(SerialDeviceModel):
+    name= None
+    version = None
+    description= None
+    
+    required_baudrate=None
+    required_bytesize=None
+    required_parity=None
+    required_stopbits=None
+    required_rts=None
+    required_dtr=None
+    
+    max_voltage=None
+    
+    set_voltage_string=None
+    set_toggle_on_string=None
+    set_toggle_off_string=None
+
     
     def __init__(self):
         super().__init__()
-        
-        self.required_baudrate=38400
-        self.required_bytesize=None
-        self.required_parity=None
-        self.required_stopbits=None
-        self.required_rts=None
-        self.required_dtr=None
-        self.voltages=[0.0]*4
         self.channels=[]
         for i in range(2):
-            self.channels.append(SimulatedPiezoPMTSignal(self,i+1))
-        self.remote_status=True
-        self.command_dict={
-        ("remote.r",1)           : None,
-        ("remote.w",2)        : None,
-        ("out.r",1)    : self.get_channel_status,
-        ("out.w",2)    : self.set_channel_status,
-        ("vout.r",1)   : self.get_channel_voltage,
-        ("vout.w",2)  : self.set_channel_voltage }
-
+            self.channels.append(SimulatedOutSignal())
+        self.set_default_settings()
         
-    max_voltage=150.0
+    def generate_constant_signal_func(self,voltage):
+        return (lambda times: np.full(len(times),voltage))
+
+    def set_default_settings(self):
+        pass
+
+    
+    
+        
+    
 
     def get_channel_status(self,channel):
         channel=int(channel)
@@ -51,11 +58,10 @@ class SimulatedPiezoDevice(SerialDeviceModel):
             channel=int(channel)
             if status==0:
                 self.channels[channel-1].outputting=False
-                return "out.w : output {} disabled".format(channel)
+                return set_toggle_on_string.format(channel)
             elif status==1:
                 self.channels[channel-1].outputting=True
-                print("out.w : output {} enabled".format(channel))
-                return "out.w : output {} enabled".format(channel)
+                return set_toggle_off_string.format(channel)
             
                     
                         
@@ -65,7 +71,7 @@ class SimulatedPiezoDevice(SerialDeviceModel):
         channel=int(channel)
         current_voltage=None
         if (1<= channel <= 4):
-                current_voltage=self.voltages[channel-1]
+            current_voltage=self.channels[channel-1].voltage
         return "{:.2f}".format(current_voltage)
                 
                 
@@ -77,7 +83,26 @@ class SimulatedPiezoDevice(SerialDeviceModel):
         elif voltage<0:
             voltage=0
         if (1<= channel <= 4):
-            self.voltages[channel-1]=voltage
+            self.channels[channel-1].voltage=voltage
 
-        return "vout.w : set output {} to {:.3f}".format(channel,voltage)
+        return self.set_voltage_string.format(channel,voltage)
 		
+class SimulatedAMO3(SimulatedPiezo):
+    name= 'AMO3'
+    version = '1.0'
+    description='test piezo'
+    
+    required_baudrate=38400
+    
+    max_voltage=150.0
+    set_voltage_string="vout.w : set output {} to {:.3f}"
+    set_toggle_on_string="out.w : output {} enabled"
+    set_toggle_off_string="out.w : output {} disabled"
+    
+    command_dict={
+        ("remote.r",1)           : None,
+        ("remote.w",2)        : None,
+        ("out.r",1)    : self.get_channel_status,
+        ("out.w",2)    : self.set_channel_status,
+        ("vout.r",1)   : self.get_channel_voltage,
+        ("vout.w",2)  : self.set_channel_voltage }

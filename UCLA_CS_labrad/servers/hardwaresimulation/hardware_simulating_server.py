@@ -113,18 +113,22 @@ class CSHardwareSimulatingServer(LabradServer):
 
 
     
-
-        
+    @setting(13, 'Simulated Read', data='v', returns='')
+    def simulated_read(self,c,count):
+        if not c['Device']:
+            return None
+        active_device=c['Device']
+        resp=active_device.read(count)
+        return resp.decode()
         
 
     @setting(14, 'Simulated Write', data='s', returns='')
     def simulated_write(self,c,data):
         if not c['Device']:
-            returnValue(None)
+            return None
         active_device=c['Device']
-        active_device.write()
-        resp=yield active_device.read()
-        returnValue(resp)
+        active_device.write(data.encode())
+        return len(data)
         
 
         

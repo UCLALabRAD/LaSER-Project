@@ -115,17 +115,17 @@ class CSSerialServer(CSPollingServer):
             
 
         def read(self,bytes):
-            yield buff_lock.acquire()
+            buff_lock.acquire()
             resp,rest=self.input_buffer[:bytes],self.input_buffer[bytes:]
             self.input_buffer=rest
             buff_lock.release()
             return resp
         
-                
+        @inlineCallbacks
         def write(self,data):
-            d= self.ser.query(data,context=self.ctxt)
-            d.addCallback(self.addtoBuffer)
-
+            resp=yield self.ser.query(data,context=self.ctxt)
+            self.addtoBuffer(resp)
+            
         def addtoBuffer(self,data):
             yield buff_lock.acquire()
             self.input_buffer.extend(data)
