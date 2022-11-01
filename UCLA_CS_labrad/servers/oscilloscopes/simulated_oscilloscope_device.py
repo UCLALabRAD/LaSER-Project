@@ -68,21 +68,24 @@ class SimulatedOscilloscope(GPIBDeviceModel):
             return str(1000000)
         else:
             wavelength_starts=self.find_where_crossing(waveform)
+            if len(wavelength_starts)==0:
+                return str(1000000)
             first_cross=wavelength_starts[0]
             last_cross=wavelength_starts[-1]
             crosses=len(wavelength_starts)-1
-        
-            return bytes(crosses/((last_cross-first_cross)/(len(waveform))*self.window_horizontal_scale*10))
-            #total_time*(last_cross-first_cross)/1000.0)))
+            print(wavelength_starts)
+            fraction_used=(last_cross-first_cross)/(len(waveform))
+            window_horiz_time_length=self.window_horizontal_scale*10
+            print(crosses/(window_horiz_time_length*fraction_used))
+            return str(crosses/(window_horiz_time_length*fraction_used))
         
     def find_where_crossing(self,waveform):
         
         max=np.amax(waveform)
         min=np.amin(waveform)
         halfway=(max+min)/2.0
-        
         cross_array=np.diff(np.sign(waveform-halfway)==1)
-        nonzero=np.nonzero(cross_array)
+        nonzero=np.nonzero(cross_array)[0]
         return nonzero
     
         

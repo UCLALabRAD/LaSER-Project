@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import scipy
 class SimulatedOutSignal(object):
     
     def __init__(self):
@@ -59,8 +60,22 @@ class SimulatedFunctionGeneratorSignal(SimulatedOutSignal):
         self.offset=0.0
         
     def calculate_signal_function(self):
-        
-        return None
+        scipy_func=None
+        if self.function=="SIN":
+            scipy_func=np.sin
+        elif self.function=="SQU":
+            scipy_func=scipy.square
+        elif self.function=="RAMP":
+            scipy_func=scipy.sawtooth
+        elif self.function=="PULS":
+            scipy_func=scipy.gausspulse
+        elif self.function=="NOIS":
+            pass
+        elif self.function=="DC":
+            pass
+        else:
+            pass
+        return (lambda arr: (scipy_func((self.frequency*arr)-self.offset))*self.amplitude)
         
         
 
