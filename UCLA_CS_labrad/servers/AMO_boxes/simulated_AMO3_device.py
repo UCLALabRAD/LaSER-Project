@@ -4,7 +4,7 @@ from labrad.errors import Error
 
 from UCLA_CS_labrad.servers.hardwaresimulation.simulated_cables import SimulatedPiezoPMTSignal
 
-__all__=['SimulatedPiezoDevice']
+__all__=['SimulatedAMO3']
 
 
 class SimulatedPiezo(SerialDeviceModel):
@@ -29,8 +29,8 @@ class SimulatedPiezo(SerialDeviceModel):
     def __init__(self):
         super().__init__()
         self.channels=[]
-        for i in range(2):
-            self.channels.append(SimulatedOutSignal())
+        for i in range(4):
+            self.channels.append(SimulatedPiezoPMTSignal())
         self.set_default_settings()
         
     def generate_constant_signal_func(self,voltage):
@@ -47,21 +47,22 @@ class SimulatedPiezo(SerialDeviceModel):
     def get_channel_status(self,channel):
         channel=int(channel)
         if (1<= channel <= 4):
-            return str(int(self.channels[channel-1].outputting))
+            return (str(int(self.channels[channel-1].outputting)))
             
                     
                         
     def set_channel_status(self,channel,status):
         channel=int(channel)
         status=int(status)
+        
         if (1<= channel <= 4):
-            channel=int(channel)
             if status==0:
                 self.channels[channel-1].outputting=False
-                return set_toggle_on_string.format(channel)
+                return self.set_toggle_off_string.format(channel)
             elif status==1:
                 self.channels[channel-1].outputting=True
-                return set_toggle_off_string.format(channel)
+                print(self.channels[channel-1])
+                return self.set_toggle_on_string.format(channel)
             
                     
                         
@@ -100,9 +101,9 @@ class SimulatedAMO3(SimulatedPiezo):
     set_toggle_off_string="out.w : output {} disabled"
     
     command_dict={
-        ("remote.r",1)           : None,
-        ("remote.w",2)        : None,
-        ("out.r",1)    : self.get_channel_status,
-        ("out.w",2)    : self.set_channel_status,
-        ("vout.r",1)   : self.get_channel_voltage,
-        ("vout.w",2)  : self.set_channel_voltage }
+        (b'remote.r',1)           : None,
+        (b'remote.w',2)        : None,
+        (b'out.r',1)    : SimulatedPiezo.get_channel_status,
+        (b'out.w',2)    : SimulatedPiezo.set_channel_status,
+        (b'vout.r',1)   : SimulatedPiezo.get_channel_voltage,
+        (b'vout.w',2)  : SimulatedPiezo.set_channel_voltage }

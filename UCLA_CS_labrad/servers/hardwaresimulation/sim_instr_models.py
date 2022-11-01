@@ -1,18 +1,14 @@
 
-
-from twisted.internet.defer import inlineCallbacks, returnValue
+#from twisted.internet.defer import inlineCallbacks, returnValue
 
 class DeviceCommInterface(object):
-    input_termination_char=None
-    output_termination_char=None
-    id_command=None
-    id_string=None
-    max_buffer_size=None
+
     
-    def __init__(self,dev,conn):
+    def __init__(self,dev):
         self.input_buffer=bytearray(b'')
         self.output_buffer=bytearray(b'')
         self.dev=dev
+        self.max_buffer_size=1000
 
     
  
@@ -30,6 +26,9 @@ class DeviceCommInterface(object):
     def name(self):
         return self.dev.name
     @property
+    def channels(self):
+        return self.dev.channels
+    @property
     def version(self):
         return self.dev.version
         
@@ -44,14 +43,20 @@ class DeviceCommInterface(object):
         else:
             return "Serial"
 
-
+    @property
+    def buffer_size(self):
+        return self.max_buffer_size
         
     @buffer_size.setter
     def buffer_size(self,val):
         self.max_buffer_size=val
-        if len(self.input_buffer)>self.max_buffer_size):
+        if len(self.input_buffer)>self.max_buffer_size:
            temp=self.input_buffer
            self.input_buffer=bytearray(temp[:max_buffer_size])
+        self.max_buffer_size=val
+        if len(self.output_buffer)>self.max_buffer_size:
+           temp=self.output_buffer
+           self.output_buffer=bytearray(temp[:max_buffer_size])
            
             
             
@@ -70,32 +75,32 @@ class DeviceCommInterface(object):
     
         
 class SerialDeviceCommInterface(DeviceCommInterface):
-    input_termination_char=b'\r\n'
-    output_termination_char=b'\n'
+
     
     
-    def __init__(self,dev,conn):
-        self.output_buffer=bytearray(b'')
+    def __init__(self,dev):
+        super().__init__(dev)
         self.comm_baudrate=None
         self.comm_bytesize=None
         self.comm_parity=None
         self.comm_stopbits=None
         self.comm_dtr=None
         self.comm_rst=None
-        self.conn=conn
 
+    
+    
     def enforce_correct_communication_parameters(self):
-        if self.dev.actual_baudrate and self.comm_baudrate!= self.dev.actual_baudrate:
+        if self.dev.required_baudrate and self.comm_baudrate!= self.dev.required_baudrate:
                 self.dev.incorrect_comm_param_handle("baudrate")
-        if self.dev.actual_bytesize and self.comm_bytesize!= self.dev.actual_bytesize:
+        if self.dev.required_bytesize and self.comm_bytesize!= self.dev.required_bytesize:
                 self.dev.incorrect_comm_param_handle("bytesize")
-        if self.dev.actual_parity and self.comm_parity!= self.dev.actual_parity:
+        if self.dev.required_parity and self.comm_parity!= self.dev.required_parity:
                 self.dev.incorrect_comm_param_handle("parity")
-        if self.dev.actual_stopbits and self.comm_stopbits!= self.dev.actual_stopbits:
+        if self.dev.required_stopbits and self.comm_stopbits!= self.dev.required_stopbits:
                 self.dev.incorrect_comm_param_handle("stopbits")
-        if self.dev.actual_dtr and self.comm_dtr!= self.dev.actual_dtr:
+        if self.dev.required_dtr and self.comm_dtr!= self.dev.required_dtr:
                 self.dev.incorrect_comm_param_handle("dtr")
-        if self.dev.actual_rts and self.comm_rts!= self.dev.actual_rts:
+        if self.dev.required_rts and self.comm_rts!= self.dev.required_rts:
                 self.dev.incorrect_comm_param_handle("rts")
     
         
@@ -104,11 +109,12 @@ class SerialDeviceCommInterface(DeviceCommInterface):
     def interpret_serial_command(self, cmd):
         body,*args=cmd.split(b' ')
         for (spec_body,arg_counts),func in self.dev.command_dict.items():
-            if type(arg_counts)==str:
+            if type(arg_counts)==int:
                 arg_counts=[arg_counts]
             if body==spec_body and len(args) in arg_counts:
                 if func:
-                    resp=func(*args)
+                    resp=self.dev.execute_command(func,args)
+                    return resp.encode()
                 else:
                     return bytearray(b'')
                 
@@ -119,38 +125,44 @@ class SerialDeviceCommInterface(DeviceCommInterface):
     def read(self,count=None):
         resp=None
         if count:
-            resp,rest=self.output_buffer[:count],self.output_buffer[count:]
-            self.output_buffer=self.output_buffer[count:]
+            resp,rest=self.input_buffer[:count],self.input_buffer[count:]
+            self.input_buffer=self.input_buffer[count:]
         else:
-            resp=self.output_buffer
-            self.output_buffer=bytearray(b'')
+            resp=self.input_buffer
+            self.input_buffer=bytearray(b'')
             
         return resp
         
     
     def write(self,data):
-        if len(self.input_buffer)+len(data)>self.max_buffer_size:
-            self.input_buffer.extend(data[:(self.max_buffer_size-len(self.input_buffer))])
+        if len(self.output_buffer)+len(data)>self.max_buffer_size:
+            self.output_buffer.extend(data[:(self.max_buffer_size-len(self.output_buffer))])
             #buffer overflow error
         else:
-            self.input_buffer.extend(data)
+            self.output_buffer.extend(data)
         self.enforce_correct_communication_parameters()
         self.process_commands()
+
         
     def process_commands(self):
-        *cmds, rest=self.dev.input_buffer.split(self.input_termination_byte)
+        *cmds, rest=self.output_buffer.split(self.dev.input_termination_byte)
+        self.output_buffer=rest
         for cmd in cmds:
+            command_interpretation=None
             try:
                 command_interpretation= self.interpret_serial_command(cmd)
                 #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
                     #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
                     #error
-            except:
+            except Exception as e:
                 #if debug mode, error
+                raise e
                 break
             
             else:
-                self.output_buffer.extend(command_interpretation+output_termination_char)
+                if command_interpretation:
+                    command_interpretation=command_interpretation+self.dev.output_termination_byte
+                self.input_buffer.extend(command_interpretation)
         
 
         
@@ -160,49 +172,58 @@ class SerialDeviceCommInterface(DeviceCommInterface):
         
         
         
-class GPIBDeviceCommInterface(object):
+class GPIBDeviceCommInterface(DeviceCommInterface):
     
-    input_termination_char=b':;'
-    output_termination_char=b';'
+
     id_string=None
     
         
     
         
     def expand_chained_commands(self,cmd):
-        keywords=cmd.split(b':')
-        tree=[keyword.split(b';') for keyword in keywords]
+        cmd=cmd.decode()
+        keywords=cmd.split(':')
+        tree=[keyword.split(';') for keyword in keywords]
         full_msg=[]
         self.collect_paths(tree,[],full_msg)
         return full_msg
 
 
-    def collect_paths(tree,current_path,path_collector)
+    def collect_paths(self,tree,current_path,path_collector):
         if len(current_path)==len(tree):
-            self.path_collector.append(current_path.join(b':'))
+            path_collector.append(bytearray(':'.join(current_path).encode()))
         else:
-            for i in paths[len(current_path)]:
-                expand_node(tree,current_path+[i],path_collector)
+            for i in tree[len(current_path)]:
+                self.collect_paths(tree,current_path+[i],path_collector)
 
 
     def check_if_scpi_match(self,cmd,cmd_scpi_format):
-        cmd=str(cmd)
-        cmd_scpi_format=str(cmd_scpi_format)
-       
-        body,args_list=cmd.split(b' ')
-        args=args_list.split(b',')
-        if body[-1]=='?' and body_format[-1]==b'?':
+
+        pieces=cmd.split(b' ')
+        body=pieces[0]
+        args=None
+        if len(pieces)>1:
+            args=pieces[1]
+        args_list=[]
+        if args:
+           args_list=args.split(b',')
+        body_format,arg_nums=cmd_scpi_format
+        body=body.decode()
+        body_format=body_format.decode()
+        if body_format[0]==':':
+           body_format=body_format[1:]
+        if body[-1]=='?' and body_format[-1]=='?':
             body=body[:-1]
             body_format=body_format[:-1]
-        body_format,arg_nums=cmd_format
-        body_format.replace(b'[:',':[')
+        body_format.replace('[:',':[')
         
-        if type(arg_nums)==str:
+        if type(arg_nums)==int:
             arg_nums=[arg_nums]
-        if not (len(args) in arg_nums):
+        if not (len(args_list) in arg_nums):
             return False
         if not (body.lower()==body or body.upper()==body):
             return False
+        
         body=body.lower()
         body_chunks_list=body.split(':')
         body_format_chunks_list=body_format.split(':')
@@ -210,34 +231,31 @@ class GPIBDeviceCommInterface(object):
             return False
         rem_block=[]
         rem_block_format=[]
-        for index, (body_chunk,body_format_chunk) in enumerate(zip(body_chunks_list, body_format_chunks_list)):
+        
+        for i, (body_chunk,body_format_chunk) in enumerate(zip(body_chunks_list, body_format_chunks_list)):
             if body_format_chunk[0]=='[' and body_format_chunk[-1]==']':
-                prefix=''.join([char for char in body_format_chunk if char.isupper()])
+                prefix=''.join([char for char in body_format_chunk if char.isupper() or char.isnumeric()])
                 prefix=prefix.lower()
                 body_format_chunk=body_format_chunk.lower()
           # if self.supports_any_prefix:
           #      if not (cmd_chunk.startswith(prefix) and cmd_format_chunk.startswith(cmd_chunk)):
            #        return False
-                if not (body_chunk==prefix or body_chunk==cmd_format_chunk):
+                if not (body_chunk==prefix or body_chunk==body_format_chunk):
                     rem_block_format.append(i)
                 else:
                     rem_block.append(i)
                     rem_block_format.append(i)
-            else:
-                    rem_block.append(i)
-                    rem_block_format.append(i)
-                    
-        body_chunks_list=[body_chunks_list[i] for i in len(body_chunks_list) if i not in rem_block]
-        body_format_chunks_list=[body_format_chunks_list[i] for i in len(body_format_chunks_list) if i not in rem_block_format]
-        
+        body_chunks_list=[body_chunks_list[i] for i in range(len(body_chunks_list)) if i not in rem_block]
+        body_format_chunks_list=[body_format_chunks_list[i] for i in range(len(body_format_chunks_list)) if i not in rem_block_format]
         for body_chunk,body_format_chunk in zip(body_chunks_list, body_format_chunks_list):
-            prefix=''.join([char for char in body_format_chunk if char.isupper()])
+            prefix=''.join([char for char in body_format_chunk if char.isupper() or char.isnumeric()])
             prefix=prefix.lower()
             body_format_chunk=body_format_chunk.lower()
+
           # if self.supports_any_prefix:
           #      if not (cmd_chunk.startswith(prefix) and cmd_format_chunk.startswith(cmd_chunk)):
            #        return False
-            if not (body_chunk==prefix or body_chunk==cmd_format_chunk):
+            if not (body_chunk==prefix or body_chunk==body_format_chunk):
                return False
         return True
 
@@ -251,31 +269,42 @@ class GPIBDeviceCommInterface(object):
                 self.clear_buffers()
                 return None
             elif cmd==self.dev.reset_command:
-                self.dev.set_to_default()
+                self.dev.set_default_settings()
                 return
             else:
+                pass
                 
                 
         else:
             is_query=False
-            if cmd.split(b' ')[0][-1]=='?':
+            if cmd.split(b' ')[0].decode()[-1]=='?':
                 is_query=True
-            for cmd_specs, func in self.command_dict.items():
+            for cmd_specs, func in self.dev.command_dict.items():
                 if (self.check_if_scpi_match(cmd,cmd_specs)):
-                    _,args_list=cmd.split(b' ')
-                    args=args_list.split(b',')
+                    
+                    pieces=cmd.split(b' ')
+                    body=pieces[0]
+                
+                    args=None
+                    if len(pieces)>1:
+                        args=pieces[1]
+                    args_list=[]
+                    if args:
+                        args_list=args.split(b',')
                     if not func:
-                            return b''
+                            return None #error
                     if is_query:
-                        resp= func(*args)
+                        
+                        resp= self.dev.execute_command(func,args_list)
                         if resp:
                             return resp
                         else:
-                            #error
+                            pass #error
                     
                     else:
-                        func(*args)
-                        return b''
+                        resp= self.dev.execute_command(func,args_list)
+                        
+                        return resp
             #error
             
         
@@ -283,48 +312,60 @@ class GPIBDeviceCommInterface(object):
     def read(self,count=None):
         resp=None
         if count:
-            resp,rest=self.output_buffer[:count],self.output_buffer[count:]
-            self.output_buffer=self.output_buffer[count:]
+            resp,rest=self.input_buffer[:count],self.input_buffer[count:]
+            self.input_buffer=self.input_buffer[count:]
         else:
-            resp=self.output_buffer
-            self.output_buffer=bytearray(b'')
+            resp=self.input_buffer
+            self.input_buffer=bytearray(b'')
             
         return resp
         
     
     def write(self,data):
-        if data[0]==b':':
+        
+        if data[:1].decode()==':':
             data=data[1:]
-        if len(self.input_buffer)+len(data)>self.max_buffer_size:
-            self.input_buffer.extend(data[:(self.max_buffer_size-len(self.input_buffer))])
+
+        if len(self.output_buffer)+len(data)>self.max_buffer_size:
+            self.output_buffer.extend(data[:(self.max_buffer_size-len(self.output_buffer))])
             #buffer overflow error
         else:
-            self.input_buffer.extend(data)
+            self.output_buffer.extend(data)
         self.process_commands()
             
         
     
     def process_commands(self):
+        self.input_buffer=bytearray(b'')
+        chained_cmds =self.output_buffer.split(self.dev.input_termination_byte)
         self.output_buffer=bytearray(b'')
-        *chained_cmds, rest=self.dev.input_buffer.split(self.input_termination_byte)
         expanded_commands=[]
         for chained_cmd in chained_cmds:
             expanded_commands.extend(self.expand_chained_commands(chained_cmd))
         for cmd in expanded_commands:
+            command_interpretation=None
             try:
+                
                 command_interpretation= self.interpret_serial_command(cmd)
                 #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
                     #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
                     #error
-            except:
-                self.output_buffer=bytearray(b'')
+            except Exception as e:
+            
+                self.input_buffer=bytearray(b'')
+                raise e
                 #if debug mode, error
                 break
             
             else:
-                self.output_buffer.extend(command_interpretation+output_termination_char)
-        if self.output_buffer:
-            self.output_buffer.append(b'\n')
+                if command_interpretation:
+                    self.input_buffer.extend(command_interpretation.encode()+self.dev.output_termination_byte)
+                
+                
+        if self.input_buffer:
+            
+            self.input_buffer=self.input_buffer[:-1]
+            self.input_buffer.extend(b'\n')
 
                 
                 
@@ -336,12 +377,25 @@ class GPIBDeviceCommInterface(object):
     
     
 class DeviceModel(object):
-    def __init__(self):
-        self.command_dict={}
-
+    command_dict=None
     
-class SerialDeviceModel(object):
+    input_termination_byte=None
+    output_termination_byte=None
+    id_command=None
+    id_string=None
+    
+    def set_default_settings(self):
+        pass
+    
+    def execute_command(self,func,args):
+        return func(self,*args)
+    
+class SerialDeviceModel(DeviceModel):
 
+
+    input_termination_byte=b'\r\n'
+    output_termination_byte=b'\n'
+    
     required_baudrate=None
     required_bytesize=None
     required_parity=None
@@ -349,38 +403,30 @@ class SerialDeviceModel(object):
     required_dtr=None
     required_rst=None
 
-    def __init__(self):
-        super().__init__()
-    
-    
-    def handle_incorrect_connection_parameter(self,param,conn):
+    command_dict=None
+
+    def incorrect_comm_param_handle(self,param):
         pass
+    
+        
+    def set_default_settings(self):
+        pass
+
+        
                 
             
-class GPIBDeviceModel(object):
+class GPIBDeviceModel(DeviceModel):
 
+    input_termination_byte=b':;'
+    output_termination_byte=b';'
+    
     id_command="*IDN?"
     id_string=None
     
-    def __init__(self):
-        super().__init__()
-        
-        self.command_dict.extend{
-        ("*IDN",0): (lambda: self.id_string)
-        ("*CLS",0): (self.clear_buffers)
-        ("*RST",0): self.start_with_defaults
-        #anything with a star, the connection will be passed as well?
-        }
-        
-        self.start_with_defaults()
-  
-    
-    def start_with_defaults(self):
+    command_dict=None
+
+    def set_default_settings(self):
         pass
-        
-    def clear_buffers(self,conn):
-        conn.input_buffer=bytearray()
-        conn.output_buffer=bytearray()
 
             
 

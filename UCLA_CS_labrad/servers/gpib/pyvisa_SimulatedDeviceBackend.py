@@ -44,8 +44,7 @@ class SimulatedDeviceVisaLibrary(VisaLibraryBase):
             
     @inlineCallbacks
     def read(self,session,count): 
-            resp=yield self.ser.gpib_read(count,context=session)
-            #print(str(count)+"BUT"+str(resp))
+            resp=yield self.read(count,context=session)
             #if count and len(resp) < count:
                # raise errors.VisaIOError(constants.StatusCode.error_timeout)
             returnValue((resp.encode(),constants.StatusCode.success))

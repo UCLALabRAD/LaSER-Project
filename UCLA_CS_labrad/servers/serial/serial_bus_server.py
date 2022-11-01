@@ -65,8 +65,6 @@ class CSSerialServer(CSPollingServer):
             self.input_buffer=bytearray()
         
             
-            self.timeout=0
-            
             self.is_broken=False
         
             self.open= lambda: self.ser.select_device(node, int(self.name[-1]), context=self.ctxt)
@@ -84,10 +82,10 @@ class CSSerialServer(CSPollingServer):
             self.buff_lock=DeferredLock()
             
         
-            self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
+            self.reset_output_buffer= lambda: self.ser.reset_input_buffer(context=self.ctxt)
             
             
-            self.set_buffer_size= lambda size: None
+            self.set_buffer_size= lambda size: self.ser.set_buffer_size(context=self.ctxt)
           
         def self.reset_input_buffer(self):
             self.input_buffer=bytearray()
@@ -107,7 +105,7 @@ class CSSerialServer(CSPollingServer):
          
         @property
         def in_waiting(self):
-            return self.ser.get_in_waiting(context=self.ctxt)
+            return len(self.input_buffer)
 
         @property
         def out_waiting(self):
@@ -125,6 +123,7 @@ class CSSerialServer(CSPollingServer):
         def write(self,data):
             resp=yield self.ser.query(data,context=self.ctxt)
             self.addtoBuffer(resp)
+            returnValue(len(data))
             
         def addtoBuffer(self,data):
             yield buff_lock.acquire()
@@ -172,7 +171,7 @@ class CSSerialServer(CSPollingServer):
                 
         @stopbits.setter
         def stopbits(self, val):
-            self.ser.stopbits(val,context=self.ctxt)
+            return self.ser.stopbits(val,context=self.ctxt)
              
         @property
         def dtr(self):

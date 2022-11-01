@@ -23,7 +23,7 @@ from labrad.server import LabradServer, Signal, setting
 from importlib import reload, import_module
 import UCLA_CS_labrad.config.hardwaresimulatingserver_config as hss_config
 
-from UCLA_CS_labrad.servers.hardwaresimulation.sim_instr_models import GPIBDeviceModel, SerialDeviceModel
+from UCLA_CS_labrad.servers.hardwaresimulation.sim_instr_models import GPIBDeviceModel, SerialDeviceModel, SerialDeviceCommInterface,GPIBDeviceCommInterface
 
 import os, sys
 
@@ -88,7 +88,7 @@ class CSHardwareSimulatingServer(LabradServer):
                 
                 # gets the experiment class from the module
                 cls = getattr(module, class_name)
-            except importError as e:
+            except ImportError as e:
                 print('Error importing simulated device model:', e)
             except AttributeError as e:
                 print(e)
@@ -113,8 +113,8 @@ class CSHardwareSimulatingServer(LabradServer):
 
 
     
-    @setting(13, 'Simulated Read', data='v', returns='')
-    def simulated_read(self,c,count):
+    @setting(13, 'Simulated Read', count='i', returns='s')
+    def simulated_read(self,c,count=None):
         if not c['Device']:
             return None
         active_device=c['Device']
@@ -122,7 +122,7 @@ class CSHardwareSimulatingServer(LabradServer):
         return resp.decode()
         
 
-    @setting(14, 'Simulated Write', data='s', returns='')
+    @setting(14, 'Simulated Write', data='s', returns='i')
     def simulated_write(self,c,data):
         if not c['Device']:
             return None
@@ -132,14 +132,14 @@ class CSHardwareSimulatingServer(LabradServer):
         
 
         
-    @setting(31, 'Add Device', node='s',address='s', instr_model='s',is_gpib='b',returns='')
+    @setting(31, 'Add Device', node='s',address='i', instr_model='s',is_gpib='b',returns='')
     def add_device(self, c, node, address,instr_model,is_gpib):
         if (node,address) in self.devices:
             raise HSSError(0)
         if instr_model not in self.sim_instr_models or (issubclass(self.sim_instr_models[instr_model].cls,GPIBDeviceModel))!=is_gpib:
             raise HSSError(2)
             
-        if issubclass(self.sim_instr_models[instr_model].cls,GPIBDeviceModel)):
+        if issubclass(self.sim_instr_models[instr_model].cls,GPIBDeviceModel):
             self.devices[(node,address)]=GPIBDeviceCommInterface(self.sim_instr_models[instr_model].cls())
         else:
             self.devices[(node,address)]=SerialDeviceCommInterface(self.sim_instr_models[instr_model].cls())
@@ -148,7 +148,7 @@ class CSHardwareSimulatingServer(LabradServer):
         
         
         
-    @setting(32, 'Remove Device', node='s', address='s', returns='')
+    @setting(32, 'Remove Device', node='s', address='i', returns='')
     def remove_device(self,c, node, address):
         if (node,address) not in self.devices:
             raise HSSError(1)
@@ -166,17 +166,17 @@ class CSHardwareSimulatingServer(LabradServer):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
-        return active_device.in_waiting
+        return len(active_device.input_buffer)
     
     @setting(42, 'Get Out-Waiting', returns='i')
     def get_out_waiting(self,c):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
-        return active_device.out_waiting
+        return len(active_device.output_buffer)
     
     
-    @setting(51, 'Reset Device Input Buffer', returns='')
+    @setting(51, 'Reset Input Buffer', returns='')
     def reset_input_buffer(self,c):
         if not c['Device']:
             raise HSSError(1)
@@ -184,7 +184,7 @@ class CSHardwareSimulatingServer(LabradServer):
         active_device.reset_input_buffer()
         
         
-    @setting(52, 'Reset Device Output Buffer', returns='')
+    @setting(52, 'Reset Output Buffer', returns='')
     def reset_output_buffer(self,c):
         if not c['Device']:
             raise HSSError(1)
@@ -192,7 +192,7 @@ class CSHardwareSimulatingServer(LabradServer):
         active_device.reset_output_buffer()
         
         
-    @setting(61, 'Select Device', node='s', address='s', returns='')
+    @setting(61, 'Select Device', node='s', address='i', returns='')
     def select_device(self,c,node,address):
         c['Device']=self.devices[(node,address)]
 
@@ -260,9 +260,9 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(100, "Reload Available Device Types")
     def reload_available_scripts(self, c):
         reload(hss_config)
-        self.load_scripts()
+        self.load_simulated_instrument_models()
         
-    @setting(110, "Add Simulated Wire",out_node='s',out_address='s',out_channel='i',in_node='s',in_address='s',in_channel='i')
+    @setting(110, "Add Simulated Wire",out_node='s',out_address='i',out_channel='i',in_node='s',in_address='i',in_channel='i')
     def add_simulated_wire(self,c,out_node,out_address,out_channel,in_node,in_address,in_channel):
         out_dev=(out_node,out_address)
         in_dev=(in_node,in_address)
@@ -278,7 +278,7 @@ class CSHardwareSimulatingServer(LabradServer):
         
            
     
-    @setting(111, "Remove Simulated Wire",in_node='s',in_address='s',in_channel='i')
+    @setting(111, "Remove Simulated Wire",in_node='s',in_address='i',in_channel='i')
     def remove_simulated_wire(self,c,in_node,in_address,in_channel):
         in_dev=(in_node,in_address)
         #try:
@@ -289,7 +289,7 @@ class CSHardwareSimulatingServer(LabradServer):
             
     @setting(121, "List Buses",returns='*s')
     def list_buses(self,c):
-        return set([loc[0] for loc in self.devices])
+        return list(set([loc[0] for loc in self.devices]))
         
     @setting(122, "List Devices", bus='s', returns='*(iss)')
     def list_devices(self,c,bus):

@@ -10,58 +10,70 @@ import time
 import numpy as np
 
 #penny CS GPIB Bus - USB0::0x0957::0x1796::MY58104761::INSTR
-class SimulatedOscilloscope(GPIBDeviceModel)
+class SimulatedOscilloscope(GPIBDeviceModel):
     name=None
     version=None
     description=None
     id_string=None
     max_window_horizontal_scale=None
     max_window_vertical_scale=None
+    points_in_record_count=None
     
     def __init__(self):
         super().__init__()
         self.channels=[]
         for i in range(4):
-            self.channels.append(SimulatedInSignal(self.max_window_horizontal_scale*10))
+            self.channels.append(SimulatedInSignal(self.max_window_horizontal_scale*10,self.points_in_record_count))
         self.set_default_settings()
             
     def set_default_settings(self):
         self.window_horizontal_scale=1
         self.window_vertical_scale=1
-        self.window_horizontal_position=1
+        self.window_horizontal_position=0
         #self.window_vertical_position=1
         
     def toggle_channel(self,channel,val=None):
         if val:
             self.channels[int(channel)-1].is_on=bool(int(val))
-        return str(int(self.channels[int(channel)-1].is_on))
+        else:
+            return str(int(self.channels[int(channel)-1].is_on))
         
     def display_measurement(display_section,channel,measurement):
         pass
         
     def measure_average(self,chan):
-        chan=int(chan[-1])
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position)
-        return bytes(np.average(waveform)))
+        chan=int(chan[-1:])
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,1)
+        if not waveform:
+            return str(0.0)
+        else:
+            print(str(np.average(waveform)))
+            return str(np.average(waveform))
         
     def measure_peak_to_peak(self,chan):
-        chan=int(chan[-1])
+        chan=int(chan[-1:])
         waveform=self.channels[chan-1].generate_waveform()
-        max=np.amax(waveform)
-        min=np.amin(waveform)
-        return max-min
+        if not waveform:
+            return str(0.0)
+        else:
+            max=np.amax(waveform)
+            min=np.amin(waveform)
+            return str(max-min)
         
         
     def measure_frequency(self,chan):
-        chan=int(chan[-1])
-        waveform=self.channels[chan-1].generate_waveform()
-        wavelength_starts=self.find_where_crossing(waveform)
-        first_cross=wavelength_starts[0]
-        last_cross=wavelength_starts[-1]
-        crosses=len(wavelength_starts)-1
+        chan=int(chan[-1:])
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,1)
+        if not waveform:
+            return str(1000000)
+        else:
+            wavelength_starts=self.find_where_crossing(waveform)
+            first_cross=wavelength_starts[0]
+            last_cross=wavelength_starts[-1]
+            crosses=len(wavelength_starts)-1
         
-        return bytes(crosses/((last_cross-first_cross)/(len(waveform))*self.window_horizontal_scale*10))
-        #total_time*(last_cross-first_cross)/1000.0)))
+            return bytes(crosses/((last_cross-first_cross)/(len(waveform))*self.window_horizontal_scale*10))
+            #total_time*(last_cross-first_cross)/1000.0)))
         
     def find_where_crossing(self,waveform):
         
@@ -131,24 +143,24 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscope):
     version = '1.0'
     description='Oscilloscope'
     id_string='AGILENT TECHNOLOGIES,DSO-X 2024A,MY58104761,02.43.2018020635'
-    max_window_horizontal_scale=5
+    max_window_horizontal_scale=2.5
     max_window_vertical_scale=5
     points_in_record_count=1000
-    self.command_dict={
-        (b':MEAS:VAV?',1) : self.measure_average,
-        (b':MEAS:FREQ?',1) : self.measure_frequency,
-        (b':MEAS:VAV',1) : self.measure_average,
-        (b':MEAS:FREQ',1) : None,
-        (b':MEAS:VAV',1) : None,
-        (b':AUT',0) : self.autoscale,
-        (b':CHAN1:DISP',1): (lambda val: self.toggle_channel('1',val))
-        (b':CHAN2:DISP',1): (lambda val: self.toggle_channel('2',val))
-        (b':CHAN3:DISP',1): (lambda val: self.toggle_channel('3',val))
-        (b':CHAN4:DISP',1): (lambda val: self.toggle_channel('4',val))
-        (b':CHAN1:DISP?',0): (lambda val: self.toggle_channel('1'))
-        (b':CHAN2:DISP?',0): (lambda val: self.toggle_channel('2'))
-        (b':CHAN3:DISP?',0): (lambda val: self.toggle_channel('3'))
-        (b':CHAN4:DISP?',0): (lambda val: self.toggle_channel('4'))
+    command_dict={
+        (b':MEASure:VAV?',1) : SimulatedOscilloscope.measure_average,
+        (b':MEASure:FREQ?',1) : SimulatedOscilloscope.measure_frequency,
+        (b':MEASure:VAV',1) : SimulatedOscilloscope.measure_average,
+        (b':MEASure:FREQ',1) : None,
+        (b':MEASure:VAV',1) : None,
+        #(b':AUT',0) : SimulatedOscilloscope.autoscale,
+        (b':CHANnel1:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'1',val)),
+        (b':CHANnel2:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'2',val)),
+        (b':CHANnel3:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'3',val)),
+        (b':CHANnel4:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'4',val)),
+        (b':CHANnel1:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'1')),
+        (b':CHANnel2:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'2')),
+        (b':CHANnel3:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'3')),
+        (b':CHANnel4:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'4'))
         }
         
  

@@ -1,5 +1,6 @@
 
 from UCLA_CS_labrad.servers.hardwaresimulation.sim_instr_models import GPIBDeviceModel
+from UCLA_CS_labrad.servers.hardwaresimulation.simulated_cables import SimulatedFunctionGeneratorSignal
 from labrad.errors import Error
 
 class SimulatedFunctionGenerator(GPIBDeviceModel):
@@ -10,41 +11,50 @@ class SimulatedFunctionGenerator(GPIBDeviceModel):
 
         
     def __init__(self):
-        super().__init__()
         self.channels=[]
-        for i in range(2):
-            self.channels.append(SimulatedFunctionGeneratorSignal(self,i))
+        for i in range(1):
+            self.channels.append(SimulatedFunctionGeneratorSignal())
         self.set_default_settings()
         
-    def set_default_parameters(self):
+    def set_default_settings(self):
         self.stored_frequency=1000.0
         self.stored_amplitude=.1
-        self.generator_on=False
         
         
     def toggle(self,status=None):
         if status:
-            if status=='ON' or (status.isnumeric() and int(status)==1):
-               self.generator_on=True
-            elif status=='OFF' or (status.isnumeric() and int(status)==0):
-               self.generator_on=False
+            if status=='ON'.encode() or (status.decode().isnumeric() and int(status)==1):
+               self.channels[0].outputting=True
+            elif status=='OFF'.encode() or (status.decode().isnumeric() and int(status)==0):
+               self.channels[0].outputting=False
         else:
-            return str(int(self.generator_on))
+            return str(int(self.channels[0].outputting))
         
 
     def frequency(self,freq=None):
         if freq:
-            self.stored_frequency=float(freq)
+            self.channels[0].frequency=float(freq)
         else:
-            return str(self.stored_frequency)
+            return str(self.channels[0].frequency)
             
     def amplitude(self,amp=None):
         if amp:
-            self.stored_amplitude=float(amp)
+            self.channels[0].amplitude=float(amp)
         else:
-            return str(self.stored_amplitude)
+            return str(self.channels[0].amplitude)
             
-                
+    def offset(self,offs=None):
+        if offs:
+            self.channels[0].offset=float(offs)
+        else:
+            return str(self.channels[0].offset)
+        
+            
+    def function(self,func=None):
+        if func:
+            self.channels[0].function=func.decode()
+        else:
+            return self.channels[0].function
         
 #frequency,amplitude,toggle
 class SimulatedAgilent33210A(SimulatedFunctionGenerator):
@@ -53,11 +63,18 @@ class SimulatedAgilent33210A(SimulatedFunctionGenerator):
     description='test function generator'
     
     id_string='Agilent Technologies,33210A,MY48007979,1.04-1.04-22-2'
-    self.command_dict={
+    command_dict={
 
-        ("OUTPut",1,True)           : self.toggle,
-        ("FREQuency",1, True)        : self.frequency,
-        ("VOLTage",1,True)        : self.amplitude }
+        (b'OUTPut',1)           : SimulatedFunctionGenerator.toggle,
+        (b'FREQuency',1)        : SimulatedFunctionGenerator.frequency,
+        (b'VOLTage',1)        : SimulatedFunctionGenerator.amplitude,
+        (b'FUNCtion',1)        : SimulatedFunctionGenerator.function,
+        (b'VOLTage:OFFSet',1)        : SimulatedFunctionGenerator.offset,
+        (b'OUTPut?',0)           : SimulatedFunctionGenerator.toggle,
+        (b'FREQuency?',0)        : SimulatedFunctionGenerator.frequency,
+        (b'VOLTage?',0)        : SimulatedFunctionGenerator.amplitude,
+        (b'FUNCtion?',0)        : SimulatedFunctionGenerator.function,
+        (b'VOLTage:OFFSet?',0)        : SimulatedFunctionGenerator.offset
     }
     
             
