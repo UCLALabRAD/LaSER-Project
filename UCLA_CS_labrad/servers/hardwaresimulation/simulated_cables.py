@@ -1,6 +1,6 @@
 import time
 import numpy as np
-import scipy
+from scipy import signal
 class SimulatedOutSignal(object):
     
     def __init__(self):
@@ -25,6 +25,7 @@ class SimulatedOutSignal(object):
             if self.currently_outputting:
                 self.output_signal_log.update(self.current_signal_function)
             else:
+                print("gothere")
                 self.output_signal_log.update(None)
             
 
@@ -54,32 +55,67 @@ class SimulatedPiezoPMTSignal(SimulatedOutSignal):
 class SimulatedFunctionGeneratorSignal(SimulatedOutSignal):
     def __init__(self):
         super().__init__()
-        self.function="SIN"
-        self.frequency=1.0
-        self.amplitude=0.0
-        self.offset=0.0
-        
-    def calculate_signal_function(self):
+        self.current_function="SIN"
+        self.current_frequency=1.0
+        self.current_amplitude=1.0
+        self.current_offset=0.0
+    def generate_periodic_signal_func(self,function,frequency,amplitude,offset):
         scipy_func=None
-        if self.function=="SIN":
+        if function=="SIN":
             scipy_func=np.sin
-        elif self.function=="SQU":
-            scipy_func=scipy.square
-        elif self.function=="RAMP":
-            scipy_func=scipy.sawtooth
-        elif self.function=="PULS":
-            scipy_func=scipy.gausspulse
-        elif self.function=="NOIS":
+        elif function=="SQU":
+            scipy_func=signal.square
+        elif function=="RAMP":
+            scipy_func=signal.sawtooth
+        elif function=="PULS":
+            scipy_func=signal.gausspulse
+        elif function=="NOIS":
             pass
-        elif self.function=="DC":
+        elif function=="DC":
             pass
         else:
             pass
-        return (lambda arr: (scipy_func((self.frequency*arr)-self.offset))*self.amplitude)
+        return (lambda arr: (scipy_func((2*np.pi*frequency*arr)-offset))*amplitude)
         
+    def calculate_signal_function(self):
+        return self.generate_periodic_signal_func(self.function,self.frequency,self.amplitude,self.offset)
+       
         
-
+    @property
+    def function(self):
+        return self.current_function
         
+    @function.setter
+    def function(self,val):
+        self.current_function=val
+        self.update_signal_function()
+        
+    @property
+    def frequency(self):
+        return self.current_frequency
+        
+    @frequency.setter
+    def frequency(self,val):
+        self.current_frequency=val
+        self.update_signal_function()
+            
+    @property
+    def amplitude(self):
+        return self.current_amplitude
+        
+    @amplitude.setter
+    def amplitude(self,val):
+        self.current_amplitude=val
+        self.update_signal_function()
+            
+    @property
+    def offset(self):
+        return self.current_offset
+        
+    @offset.setter
+    def offset(self,val):
+        self.current_offset=val
+        self.update_signal_function()
     
     
 class SignalLog(object):
@@ -94,6 +130,7 @@ class SignalLog(object):
         current_time=time.time()
         self.log.append((current_time,new_func))
         self.clip_record()
+        print(self.log)
         
         
     def clip_record(self):
@@ -156,7 +193,6 @@ class SimulatedInSignal(object):
         record=[((self.input_signal_log.log[i][0]-record_start_time),self.input_signal_log.log[i][1]) for i in range(len(self.input_signal_log.log))]
         if (record[0][0]>0.0):
             record.insert(0,(0.0,None))
-        print(record)
         x_vals=np.linspace(window_horiz_start,window_horiz_end,self.points_in_memory)
         split_points=[rec[0] for rec in record]
         split_indices=np.searchsorted(x_vals,split_points,'left')

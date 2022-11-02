@@ -151,7 +151,6 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscope):
         (b':MEASure:FREQ?',1) : SimulatedOscilloscope.measure_frequency,
         (b':MEASure:VAV',1) : SimulatedOscilloscope.measure_average,
         (b':MEASure:FREQ',1) : None,
-        (b':MEASure:VAV',1) : None,
         #(b':AUT',0) : SimulatedOscilloscope.autoscale,
         (b':CHANnel1:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'1',val)),
         (b':CHANnel2:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'2',val)),
