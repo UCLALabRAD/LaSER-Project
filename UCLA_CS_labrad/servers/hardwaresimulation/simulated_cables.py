@@ -143,9 +143,7 @@ class SimulatedInSignal(object):
             
            
     def generate_waveform(self,horiz_scale,horiz_pos, vert_scale):#,vert_pos):
-        #if not self.is_on or (not self.input_signal_log):
-            #return None
-        if (not self.input_signal_log):
+        if not self.is_on or (not self.input_signal_log):
             return None
             
         window_horiz_start=horiz_pos+(self.record_time_length/2.0)-(horiz_scale*5)
@@ -155,9 +153,10 @@ class SimulatedInSignal(object):
         current_time=time.time()
         record_start_time=current_time-self.record_time_length
         self.input_signal_log.clip_record()
-        if self.input_signal_log.log[0][0] > record_start_time:
-            return None
         record=[((self.input_signal_log.log[i][0]-record_start_time),self.input_signal_log.log[i][1]) for i in range(len(self.input_signal_log.log))]
+        if (record[0][0]>0.0):
+            record.insert(0,(0.0,None))
+        print(record)
         x_vals=np.linspace(window_horiz_start,window_horiz_end,self.points_in_memory)
         split_points=[rec[0] for rec in record]
         split_indices=np.searchsorted(x_vals,split_points,'left')

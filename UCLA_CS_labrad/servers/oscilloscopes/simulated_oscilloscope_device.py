@@ -43,6 +43,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         
     def measure_average(self,chan):
         chan=int(chan[-1:])
+        self.channels[chan-1].is_on=True
         waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,1)
         if not waveform:
             return str(0.0)
@@ -52,6 +53,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         
     def measure_peak_to_peak(self,chan):
         chan=int(chan[-1:])
+        self.channels[chan-1].is_on=True
         waveform=self.channels[chan-1].generate_waveform()
         if not waveform:
             return str(0.0)
@@ -63,6 +65,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         
     def measure_frequency(self,chan):
         chan=int(chan[-1:])
+        self.channels[chan-1].is_on=True
         waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,1)
         if not waveform:
             return str(1000000)
@@ -70,10 +73,11 @@ class SimulatedOscilloscope(GPIBDeviceModel):
             wavelength_starts=self.find_where_crossing(waveform)
             if len(wavelength_starts)==0:
                 return str(1000000)
+            elif len(wavelength_starts)==1:
+                return str(0)
             first_cross=wavelength_starts[0]
             last_cross=wavelength_starts[-1]
             crosses=len(wavelength_starts)-1
-            print(wavelength_starts)
             fraction_used=(last_cross-first_cross)/(len(waveform))
             window_horiz_time_length=self.window_horizontal_scale*10
             print(crosses/(window_horiz_time_length*fraction_used))
@@ -90,14 +94,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     
         
         
-    def measure_peak_to_peak(self,chan):
-        chan=int(chan[-1])
-        waveform=self.channels[chan-1].generate_waveform(self.window)
-        max=np.amax(waveform)
-        min=np.amin(waveform)
-        return (max-min)
-        
-        
+
     '''
     def autoscale(self):
         self.window_horizontal_position=self.max_window_horizontal_scale*5

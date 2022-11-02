@@ -24,7 +24,7 @@ from labrad.errors import Error
 from labrad.server import setting, Signal
 from twisted.internet import reactor, threads
 from twisted.internet.task import deferLater
-from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import inlineCallbacks, returnValue, DeferredLock
 
 from serial import Serial
 from serial.tools import list_ports
@@ -54,54 +54,45 @@ class CSSerialServer(CSPollingServer):
         """
         
         active_device_connections=[]
-        def __init__(self, hss, node, port,context):
-        
-            self.name="SIMCOM"+str(port)
+        def __init__(self, hss, node, name,context):
             
-            self.ctxt=context
-         
-            self.ser=hss
-            
-            self.input_buffer=bytearray()
-        
-            
-            self.is_broken=False
-        
-            self.open= lambda: self.ser.select_device(node, int(self.name[-1]), context=self.ctxt)
-            
-            if self.port in self.active_device_connections:
+            if name in self.active_device_connections:
                 raise Error()
-                    
-            
-            self.active_device_connections.append(self.port)
-            
-            if self.ser:
-                self.open()
                 
+            self.name=name
+            self.ctxt=context
+            self.ser=hss
+            self.input_buffer=bytearray(b'')
             
-            self.buff_lock=DeferredLock()
             
-        
-            self.reset_output_buffer= lambda: self.ser.reset_input_buffer(context=self.ctxt)
+            self.open= lambda: self.ser.select_device(node, int(self.name[-1]), context=self.ctxt)
+            self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
             
             
             self.set_buffer_size= lambda size: self.ser.set_buffer_size(context=self.ctxt)
+            
+            
+                
+            self.buff_lock=DeferredLock()
+            self.active_device_connections.append(self.name)
+            if self.ser:
+                self.open()
+                
+
           
-        def self.reset_input_buffer(self):
+        def reset_input_buffer(self):
             self.input_buffer=bytearray()
             
+        @inlineCallbacks
         def break_connection(self):
-            if self.port in self.active_device_connections:
-                self.active_device_connections.remove(self.port)    
+            if self.name in self.active_device_connections:
+                self.active_device_connections.remove(self.name)
+            if self.ser:
+                yield self.ser.deselect_device(context=self.ctxt)
  
-
         @inlineCallbacks
         def close(self):
-            self.break_connection()
-            try:
-                yield self.ser.deselect_device(context=self.ctxt)
-            except:
-                pass
+            yield self.break_connection()
          
         @property
         def in_waiting(self):
@@ -112,23 +103,28 @@ class CSSerialServer(CSPollingServer):
             return self.ser.get_out_waiting(context=self.ctxt)
             
 
-        def read(self,bytes):
-            buff_lock.acquire()
-            resp,rest=self.input_buffer[:bytes],self.input_buffer[bytes:]
-            self.input_buffer=rest
-            buff_lock.release()
-            return resp
+        def read(self,byte_count):
+            if not self.buff_lock.locked:
+                self.buff_lock.acquire()
+                resp,rest=self.input_buffer[:byte_count],self.input_buffer[byte_count:]
+                self.input_buffer=rest
+                self.buff_lock.release()
+                return bytes(resp)
+            else:
+                return b''
         
         @inlineCallbacks
         def write(self,data):
-            resp=yield self.ser.query(data,context=self.ctxt)
-            self.addtoBuffer(resp)
+            yield self.ser.simulated_write(data,context=self.ctxt)
+            resp=yield self.ser.simulated_read(context=self.ctxt)
+            yield self.addtoBuffer(resp.encode())
             returnValue(len(data))
             
+        @inlineCallbacks
         def addtoBuffer(self,data):
-            yield buff_lock.acquire()
+            yield self.buff_lock.acquire()
             self.input_buffer.extend(data)
-            buff_lock.release()
+            self.buff_lock.release()
 
         @property
         def baudrate(self):
@@ -242,14 +238,16 @@ class CSSerialServer(CSPollingServer):
                 _, _, dev_name = dev_path.rpartition(os.sep)
                 self.SerialPorts.append(SerialDevice(dev_name,dev_path,None))
             
-        for port in self.occupied_sim_port_list:
+        for d in self.sim_dev_list:
             try:
-                ser = self.DeviceConnection(None,self.name,port,None)
+                ser = self.DeviceConnection(None,self.name,d,None)
                 ser.close()
             except:
                 pass
+                
+                
             else:
-                self.SerialPorts.append(SerialDevice(port,None,self.HSS))
+                self.SerialPorts.append(SerialDevice(d,None,self.HSS))
                 
 
         port_list_tmp = [x.name for x in self.SerialPorts]
@@ -671,7 +669,7 @@ class CSSerialServer(CSPollingServer):
     @inlineCallbacks
     def serverDisconnected(self, ID, name):
         if name=='CS Hardware Simulating Server':
-            self.sim_devices=[]
+            self.sim_dev_list=[]
             yield self.HSS.removeListener(listener=self.simDeviceAdded,source = None,ID=8675309)
             yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
             self.HSS=None
@@ -690,20 +688,22 @@ class CSSerialServer(CSPollingServer):
         node, port=data
         cli=self.client
         if node==self.name:
-            self.sim_dev_list.append(port)
+            self.sim_dev_list.append("SIMCOM"+str(port))
 
    
    
     def simDeviceRemoved(self, c, data):
         node, port=data
         if node==self.name:
-            self.sim_dev_list.remove(port)
+            self.sim_dev_list.remove("SIMCOM"+str(port))
             for ctxt_dict in [ctxt.data for ctxt in self.contexts.values()]:
                 port_obj=ctxt_dict['PortObject']
                 if not port_obj:
                     continue
-                elif isinstance(port_obj,self.DeviceConnection):
+                elif isinstance(port_obj,self.DeviceConnection) and port_obj.name=="SIMCOM"+str(port):
                     port_obj.break_connection()
+                    break
+                    
         
    
    

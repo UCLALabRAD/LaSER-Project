@@ -59,8 +59,8 @@ SimInstrModel = collections.namedtuple('SimInstrModel', ['name','version','descr
 class CSHardwareSimulatingServer(LabradServer):
 
     name='CS Hardware Simulating Server'
-    device_added=Signal(565656,'Signal: Device Added','(s,s)')
-    device_removed=Signal(676767,'Signal: Device Removed','(s,s)')
+    device_added=Signal(565656,'Signal: Device Added','(s,i)')
+    device_removed=Signal(676767,'Signal: Device Removed','(s,i)')
 
     def initServer(self):
         super().initServer()
