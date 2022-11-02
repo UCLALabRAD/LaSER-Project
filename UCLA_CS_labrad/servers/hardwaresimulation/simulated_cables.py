@@ -25,7 +25,6 @@ class SimulatedOutSignal(object):
             if self.currently_outputting:
                 self.output_signal_log.update(self.current_signal_function)
             else:
-                print("gothere")
                 self.output_signal_log.update(None)
             
 
@@ -64,11 +63,11 @@ class SimulatedFunctionGeneratorSignal(SimulatedOutSignal):
         if function=="SIN":
             scipy_func=np.sin
         elif function=="SQU":
-            scipy_func=signal.square
+            scipy_func=signal.square #duty supported
         elif function=="RAMP":
-            scipy_func=signal.sawtooth
+            scipy_func=signal.sawtooth #symmetry supported
         elif function=="PULS":
-            scipy_func=signal.gausspulse
+            pass
         elif function=="NOIS":
             pass
         elif function=="DC":
@@ -130,7 +129,6 @@ class SignalLog(object):
         current_time=time.time()
         self.log.append((current_time,new_func))
         self.clip_record()
-        print(self.log)
         
         
     def clip_record(self):

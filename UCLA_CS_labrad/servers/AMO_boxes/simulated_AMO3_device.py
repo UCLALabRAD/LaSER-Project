@@ -61,7 +61,6 @@ class SimulatedPiezo(SerialDeviceModel):
                 return self.set_toggle_off_string.format(channel)
             elif status==1:
                 self.channels[channel-1].outputting=True
-                print(self.channels[channel-1])
                 return self.set_toggle_on_string.format(channel)
             
                     

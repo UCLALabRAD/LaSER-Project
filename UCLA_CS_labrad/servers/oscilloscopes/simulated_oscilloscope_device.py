@@ -48,7 +48,6 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         if not waveform:
             return str(0.0)
         else:
-            print(str(np.average(waveform)))
             return str(np.average(waveform))
         
     def measure_peak_to_peak(self,chan):
@@ -80,7 +79,6 @@ class SimulatedOscilloscope(GPIBDeviceModel):
             crosses=len(wavelength_starts)-1
             fraction_used=(last_cross-first_cross)/(len(waveform))
             window_horiz_time_length=self.window_horizontal_scale*10
-            print(crosses/(window_horiz_time_length*fraction_used))
             return str(crosses/(window_horiz_time_length*fraction_used))
         
     def find_where_crossing(self,waveform):
@@ -88,9 +86,10 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         max=np.amax(waveform)
         min=np.amin(waveform)
         halfway=(max+min)/2.0
-        cross_array=np.diff(np.sign(waveform-halfway)==1)
-        nonzero=np.nonzero(cross_array)[0]
-        return nonzero
+        signs=np.sign(waveform-halfway)
+        where_pos=(np.clip(signs,0,1))
+        pos_changes=np.nonzero(np.diff(where_pos)==1)
+        return pos_changes[0]
     
         
         
