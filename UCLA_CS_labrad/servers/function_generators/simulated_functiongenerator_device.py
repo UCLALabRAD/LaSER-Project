@@ -17,8 +17,13 @@ class SimulatedFunctionGenerator(GPIBDeviceModel):
         self.set_default_settings()
         
     def set_default_settings(self):
-        self.stored_frequency=1000.0
-        self.stored_amplitude=.1
+        for chan in self.channels:
+             chan.outputting=False
+             chan.frequency=1.0
+             chan.amplitude=1.0
+             chan.function="SIN"
+             chan.offset=0.0
+             
         
         
     def toggle(self,status=None):

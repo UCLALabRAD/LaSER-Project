@@ -30,7 +30,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         self.window_horizontal_scale=1
         self.window_vertical_scale=1
         self.window_horizontal_position=0
-        #self.window_vertical_position=1
+        #self.window_vertical_position=0
         
     def toggle_channel(self,channel,val=None):
         if val:
@@ -150,8 +150,6 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscope):
     command_dict={
         (b':MEASure:VAV?',1) : SimulatedOscilloscope.measure_average,
         (b':MEASure:FREQ?',1) : SimulatedOscilloscope.measure_frequency,
-        (b':MEASure:VAV',1) : SimulatedOscilloscope.measure_average,
-        (b':MEASure:FREQ',1) : None,
         (b':AUT',0) : SimulatedOscilloscope.autoscale,
         (b':CHANnel1:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'1',val)),
         (b':CHANnel2:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'2',val)),
@@ -160,7 +158,12 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscope):
         (b':CHANnel1:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'1')),
         (b':CHANnel2:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'2')),
         (b':CHANnel3:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'3')),
-        (b':CHANnel4:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'4'))
+        (b':CHANnel4:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'4')),
+        (b':TEST:HI:THERE'):None,
+        (b':TEST:HI:HERE'):None,
+        (b':TEST:HEY:THERE'):None,
+        (b':TEST:HEY:HERE'):None
+        
         }
         
  

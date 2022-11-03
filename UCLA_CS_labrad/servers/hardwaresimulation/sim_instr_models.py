@@ -160,8 +160,9 @@ class SerialDeviceCommInterface(DeviceCommInterface):
                     #error
             except Exception as e:
                 #if debug mode, error
-                raise e
+                #raise e
                 break
+                
             
             else:
                 if command_interpretation:
@@ -219,8 +220,7 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
         if body[-1]=='?' and body_format[-1]=='?':
             body=body[:-1]
             body_format=body_format[:-1]
-        body_format.replace('[:',':[')
-        
+        body_format=body_format.replace('[:',':[')
         if type(arg_nums)==int:
             arg_nums=[arg_nums]
         if not (len(args_list) in arg_nums):
@@ -231,36 +231,38 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
         body=body.lower()
         body_chunks_list=body.split(':')
         body_format_chunks_list=body_format.split(':')
-        if len(body_chunks_list)!=len(body_format_chunks_list):
-            return False
         rem_block=[]
         rem_block_format=[]
         
-        for i, (body_chunk,body_format_chunk) in enumerate(zip(body_chunks_list, body_format_chunks_list)):
-            if body_format_chunk[0]=='[' and body_format_chunk[-1]==']':
+                    
+        index_in_format=0
+        for body_chunk in body_chunks_list:
+            
+            while True:
+                if index_in_format>=len(body_format_chunks_list):
+                    return False
+                body_format_chunk=body_format_chunks_list[index_in_format]
+                can_skip=False
+                if body_format_chunk[0]=='[' and body_format_chunk[-1]==']':
+                    can_skip=True
+                    body_format_chunk=body_format_chunk[1:-1]
                 prefix=''.join([char for char in body_format_chunk if char.isupper() or char.isnumeric()])
                 prefix=prefix.lower()
                 body_format_chunk=body_format_chunk.lower()
-          # if self.supports_any_prefix:
-          #      if not (cmd_chunk.startswith(prefix) and cmd_format_chunk.startswith(cmd_chunk)):
-           #        return False
+                # if self.supports_any_prefix:
+                #      if not (cmd_chunk.startswith(prefix) and cmd_format_chunk.startswith(cmd_chunk)):
+                #        return False
                 if not (body_chunk==prefix or body_chunk==body_format_chunk):
-                    rem_block_format.append(i)
+                   if can_skip:
+                       index_in_format=index_in_format+1
+                   else:
+                       return False
                 else:
-                    rem_block.append(i)
-                    rem_block_format.append(i)
-        body_chunks_list=[body_chunks_list[i] for i in range(len(body_chunks_list)) if i not in rem_block]
-        body_format_chunks_list=[body_format_chunks_list[i] for i in range(len(body_format_chunks_list)) if i not in rem_block_format]
-        for body_chunk,body_format_chunk in zip(body_chunks_list, body_format_chunks_list):
-            prefix=''.join([char for char in body_format_chunk if char.isupper() or char.isnumeric()])
-            prefix=prefix.lower()
-            body_format_chunk=body_format_chunk.lower()
-
-          # if self.supports_any_prefix:
-          #      if not (cmd_chunk.startswith(prefix) and cmd_format_chunk.startswith(cmd_chunk)):
-           #        return False
-            if not (body_chunk==prefix or body_chunk==body_format_chunk):
-               return False
+                   index_in_format=index_in_format+1
+                   break
+        for rem_body_format_chunk in body_format_chunks_list[index_in_format:]:
+            if body_format_chunk[0]!='[' or body_format_chunk[-1]!=']':
+                    return False
         return True
 
 
@@ -296,20 +298,20 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
                     if args:
                         args_list=args.split(b',')
                     if not func:
-                            return None #error
+                        return
                     if is_query:
                         
                         resp= self.dev.execute_command(func,args_list)
                         if resp:
                             return resp
                         else:
-                            pass #error
+                            raise Exception()
                     
                     else:
                         resp= self.dev.execute_command(func,args_list)
                         
                         return resp
-            #error
+            raise Exception()
             
         
         
@@ -346,6 +348,7 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
         expanded_commands=[]
         for chained_cmd in chained_cmds:
             expanded_commands.extend(self.expand_chained_commands(chained_cmd))
+        print(expanded_commands)
         for cmd in expanded_commands:
             command_interpretation=None
             try:
@@ -357,15 +360,17 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
             except Exception as e:
             
                 self.input_buffer=bytearray(b'')
-                raise e
                 #if debug mode, error
+                raise e
+                
+            
                 break
             
             else:
                 if command_interpretation:
                     self.input_buffer.extend(command_interpretation.encode()+self.dev.output_termination_byte)
                 
-                
+        
         if self.input_buffer:
             
             self.input_buffer=self.input_buffer[:-1]
@@ -421,11 +426,12 @@ class SerialDeviceModel(DeviceModel):
             
 class GPIBDeviceModel(DeviceModel):
 
-    input_termination_byte=b':;'
+    input_termination_byte=b';:'
     output_termination_byte=b';'
     
     id_command=b'*IDN?'
     clear_command=b'*CLS'
+    reset_command=b'*RST'
     id_string=None
     
     command_dict=None
