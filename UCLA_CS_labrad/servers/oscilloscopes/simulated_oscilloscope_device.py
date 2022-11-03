@@ -44,7 +44,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     def measure_average(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,1)
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.window_vertical_scale)
         if not waveform:
             return str(0.0)
         else:
@@ -65,7 +65,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     def measure_frequency(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,1)
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.window_vertical_scale)
         if not waveform:
             return str(1000000)
         else:
@@ -94,8 +94,10 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         
         
 
-    '''
+    
     def autoscale(self):
+	    pass
+	    '''
         self.window_horizontal_position=self.max_window_horizontal_scale*5
         horiz_scale_new_window=0
         vert_position_new_window=0
@@ -144,13 +146,13 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscope):
     id_string='AGILENT TECHNOLOGIES,DSO-X 2024A,MY58104761,02.43.2018020635'
     max_window_horizontal_scale=2.5
     max_window_vertical_scale=5
-    points_in_record_count=1000
+    points_in_record_count=100000
     command_dict={
         (b':MEASure:VAV?',1) : SimulatedOscilloscope.measure_average,
         (b':MEASure:FREQ?',1) : SimulatedOscilloscope.measure_frequency,
         (b':MEASure:VAV',1) : SimulatedOscilloscope.measure_average,
         (b':MEASure:FREQ',1) : None,
-        #(b':AUT',0) : SimulatedOscilloscope.autoscale,
+        (b':AUT',0) : SimulatedOscilloscope.autoscale,
         (b':CHANnel1:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'1',val)),
         (b':CHANnel2:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'2',val)),
         (b':CHANnel3:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'3',val)),

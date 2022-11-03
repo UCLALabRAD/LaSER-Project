@@ -278,12 +278,12 @@ class CSGPIBBusServer(CSPollingServer):
             yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
             self.HSS=None
             
-    @setting(71, 'Add Simulated Device', address='s', device_type='s',returns='')
+    @setting(71, 'Add Simulated Device', address='i', device_type='s',returns='')
     def add_simulated_device(self, c, address,device_type):
         if self.HSS:
             yield self.HSS.add_device(self.name,address,device_type,True)
         
-    @setting(72, 'Remove Simulated Device', address='s', returns='')
+    @setting(72, 'Remove Simulated Device', address='i', returns='')
     def remove_simulated_device(self, c, address):
         if self.HSS:
             yield self.HSS.remove_device(self.name,address)

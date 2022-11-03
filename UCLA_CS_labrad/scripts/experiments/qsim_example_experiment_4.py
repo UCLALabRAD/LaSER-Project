@@ -122,7 +122,8 @@ class LaserExperiment4(QsimExperiment):
                 # get oscilloscope reading
                 voltage_mean = self.os_server.measure(1)
                 print(voltage_mean)
-                voltage_frequency = self.os_server.measure(2)			
+                voltage_frequency = self.os_server.measure(2)
+                print(voltage_frequency)
                 # adds the data to Data Vault
                 self.dv.add(x_point, voltage_mean, voltage_frequency)
             time.sleep(1.0/(2.0*params.PWM_Frequency))

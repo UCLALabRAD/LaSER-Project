@@ -57,7 +57,11 @@ class DeviceCommInterface(object):
         if len(self.output_buffer)>self.max_buffer_size:
            temp=self.output_buffer
            self.output_buffer=bytearray(temp[:max_buffer_size])
-           
+
+
+    def clear_buffers(self):
+        self.reset_output_buffer()
+        self.reset_input_buffer()        
             
             
         
@@ -262,7 +266,7 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
 
     def interpret_serial_command(self, cmd):
         #query vs setting vs default
-        if cmd[0]==b'*':
+        if cmd.decode()[0]=='*':
             if cmd==self.dev.id_command:
                 return self.dev.id_string
             elif cmd==self.dev.clear_command:
@@ -420,7 +424,8 @@ class GPIBDeviceModel(DeviceModel):
     input_termination_byte=b':;'
     output_termination_byte=b';'
     
-    id_command="*IDN?"
+    id_command=b'*IDN?'
+    clear_command=b'*CLS'
     id_string=None
     
     command_dict=None

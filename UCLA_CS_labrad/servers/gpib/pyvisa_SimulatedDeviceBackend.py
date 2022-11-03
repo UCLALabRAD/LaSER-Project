@@ -18,17 +18,19 @@ class SimulatedDeviceVisaLibrary(VisaLibraryBase):
         self.cli=None
         self.ser=None
         self.sim_addresses=None
+		
 
     def open_default_resource_manager(self):
         return "DefaultResourceManagerSession", constants.StatusCode.success
         
     def list_resources(self,session,query='?*::INSTR'):
-        return tuple(self.sim_addresses)
+        return tuple(["SIM::"+str(address)+"::INSTR" for address in self.sim_addresses])
 
     def open(self, session, resource_name,
              access_mode=None, open_timeout=None):
         instr_session=self.cli.context()
-        self.ser.select_device(self.node, resource_name,context=instr_session)
+        addr=resource_name.split('::')[1]
+        self.ser.select_device(self.node, int(addr),context=instr_session)
         
         return instr_session, constants.StatusCode.success
 
@@ -44,7 +46,7 @@ class SimulatedDeviceVisaLibrary(VisaLibraryBase):
             
     @inlineCallbacks
     def read(self,session,count): 
-            resp=yield self.read(count,context=session)
+            resp=yield self.ser.simulated_read(count,context=session)
             #if count and len(resp) < count:
                # raise errors.VisaIOError(constants.StatusCode.error_timeout)
             returnValue((resp.encode(),constants.StatusCode.success))
@@ -53,7 +55,7 @@ class SimulatedDeviceVisaLibrary(VisaLibraryBase):
 
     @inlineCallbacks
     def write(self,session,data):
-        bytes=yield self.ser.gpib_write(data.decode(),context=session)
+        bytes=yield self.ser.simulated_write(data.decode(),context=session)
         returnValue((bytes,constants.StatusCode.success))
         
 
