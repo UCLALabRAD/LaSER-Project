@@ -1,5 +1,6 @@
 
-#from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import inlineCallbacks, returnValue, DeferredLock
+from twisted.internet.threads import deferToThread
 
 class DeviceCommInterface(object):
 
@@ -9,8 +10,8 @@ class DeviceCommInterface(object):
         self.output_buffer=bytearray(b'')
         self.dev=dev
         self.max_buffer_size=1000
+        self.lock=DeferredLock()
 
-    
  
     def read(self):
         pass
@@ -137,7 +138,7 @@ class SerialDeviceCommInterface(DeviceCommInterface):
             
         return resp
         
-    
+    @inlineCallbacks
     def write(self,data):
         if len(self.output_buffer)+len(data)>self.max_buffer_size:
             self.output_buffer.extend(data[:(self.max_buffer_size-len(self.output_buffer))])
@@ -145,29 +146,30 @@ class SerialDeviceCommInterface(DeviceCommInterface):
         else:
             self.output_buffer.extend(data)
         self.enforce_correct_communication_parameters()
-        self.process_commands()
-
+        yield self.process_commands()
         
+
+    @inlineCallbacks
     def process_commands(self):
         *cmds, rest=self.output_buffer.split(self.dev.input_termination_byte)
         self.output_buffer=rest
         for cmd in cmds:
             command_interpretation=None
-            try:
-                command_interpretation= self.interpret_serial_command(cmd)
+            #try:
+            command_interpretation= yield deferToThread(lambda:self.interpret_serial_command(cmd))
                 #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
                     #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
                     #error
-            except Exception as e:
-                #if debug mode, error
+            #except Exception as e:
+                #if debug mode, add to list
                 #raise e
-                break
+                #break
                 
             
-            else:
-                if command_interpretation:
-                    command_interpretation=command_interpretation+self.dev.output_termination_byte
-                self.input_buffer.extend(command_interpretation)
+            #else:
+            if command_interpretation:
+                command_interpretation=command_interpretation+self.dev.output_termination_byte
+            self.input_buffer.extend(command_interpretation)
         
 
         

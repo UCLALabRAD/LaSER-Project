@@ -113,17 +113,20 @@ class CSSerialServer(CSPollingServer):
             else:
                 return b''
         
-        @inlineCallbacks
         def write(self,data):
-            yield self.ser.simulated_write(data,context=self.ctxt)
-            resp=yield self.ser.simulated_read(context=self.ctxt)
-            yield self.addtoBuffer(resp.encode())
-            returnValue(len(data))
+            self.ser.simulated_write(data,context=self.ctxt)
+            d=self.ser.simulated_read(context=self.ctxt)
+            d.addCallback(lambda x: x.encode())
+            d.addCallback(self.addtoBuffer)
+            #print(int(len(data)))
+            #return int(len(data))
             
         @inlineCallbacks
         def addtoBuffer(self,data):
             yield self.buff_lock.acquire()
+            #print(data)
             self.input_buffer.extend(data)
+            #print(self.input_buffer)
             self.buff_lock.release()
 
         @property
@@ -427,9 +430,9 @@ class CSSerialServer(CSPollingServer):
         # encode as needed
         if type(data) == str:
             data = data.encode()
-        yield ser.write(data)
-
-        returnValue(int(len(data)))
+        ser.write(data)
+        
+        return int(len(data))
 
     @setting(42, 'Write Line', data=['s: Data to send'], returns=['w: Bytes sent'])
     def write_line(self, c, data,simulated=None):
@@ -442,7 +445,7 @@ class CSSerialServer(CSPollingServer):
         if type(data) == str:
             data = data.encode()
         data += b'\r\n'
-        yield ser.write(data)
+        ser.write(data)
 
         returnValue(int(len(data)))
 

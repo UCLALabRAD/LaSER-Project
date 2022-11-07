@@ -1,6 +1,7 @@
 import time
 import numpy as np
 from scipy import signal
+import threading
 class SimulatedOutSignal(object):
     
     def __init__(self):
@@ -58,6 +59,8 @@ class SimulatedFunctionGeneratorSignal(SimulatedOutSignal):
         self.current_frequency=1.0
         self.current_amplitude=1.0
         self.current_offset=0.0
+        
+        
     def generate_periodic_signal_func(self,function,frequency,amplitude,offset):
         scipy_func=None
         if function=="SIN":
@@ -119,6 +122,7 @@ class SimulatedFunctionGeneratorSignal(SimulatedOutSignal):
     
 class SignalLog(object):
     def __init__(self):
+        self.lock=threading.Lock
         self.log=[]
         self.record_time_length=None
         #self.lock needed???
@@ -126,9 +130,12 @@ class SignalLog(object):
     def update(self, new_func):
         if not self.record_time_length:
             return
+        self.lock.acquire()
         current_time=time.time()
         self.log.append((current_time,new_func))
         self.clip_record()
+        self.lock.release()
+        
         
         
     def clip_record(self):
@@ -144,7 +151,6 @@ class SignalLog(object):
             pass
         else:
             self.log=self.log[last_record_starting_before_window:]
-        
             
     
     def erase_log(self):
@@ -170,6 +176,7 @@ class SimulatedInSignal(object):
         
         
         
+        
     def unplug(self):
         self.input_signal_log.record_time_length=None
         self.input_signal_log.erase_log()
@@ -187,8 +194,10 @@ class SimulatedInSignal(object):
         window_vert_end=5*vert_scale
         current_time=time.time()
         record_start_time=current_time-self.record_time_length
+        self.input_signal_log.lock.acquire()
         self.input_signal_log.clip_record()
         record=[((self.input_signal_log.log[i][0]-record_start_time),self.input_signal_log.log[i][1]) for i in range(len(self.input_signal_log.log))]
+        self.input_signal_log.lock.release()
         if (record[0][0]>0.0):
             record.insert(0,(0.0,None))
         x_vals=np.linspace(window_horiz_start,window_horiz_end,self.points_in_memory)

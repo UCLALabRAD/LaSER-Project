@@ -15,7 +15,9 @@ message = 987654321
 timeout = 20
 ### END NODE INFO
 """
-from twisted.internet.defer import returnValue, inlineCallbacks, DeferredLock
+
+import time
+from twisted.internet.defer import returnValue, inlineCallbacks, DeferredList
 import collections
 from labrad.errors import Error
 from labrad.server import LabradServer, Signal, setting
@@ -118,7 +120,9 @@ class CSHardwareSimulatingServer(LabradServer):
         if not c['Device']:
             return None
         active_device=c['Device']
+        yield active_device.lock.acquire()
         resp=active_device.read(count)
+        active_device.lock.release()
         return resp.decode()
         
 
@@ -127,7 +131,9 @@ class CSHardwareSimulatingServer(LabradServer):
         if not c['Device']:
             return None
         active_device=c['Device']
-        active_device.write(data.encode())
+        yield active_device.lock.acquire()
+        yield active_device.write(data.encode())
+        active_device.lock.release()
         return len(data)
         
 
@@ -173,7 +179,9 @@ class CSHardwareSimulatingServer(LabradServer):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
-        return len(active_device.output_buffer)
+        yield active_device.lock.acquire()
+        buf_len=len(active_device.output_buffer)
+        active_device.lock.release()
     
     
     @setting(51, 'Reset Input Buffer', returns='')
@@ -181,7 +189,9 @@ class CSHardwareSimulatingServer(LabradServer):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
+        yield active_device.lock.acquire()
         active_device.reset_input_buffer()
+        active_device.lock.release()
         
         
     @setting(52, 'Reset Output Buffer', returns='')
@@ -189,13 +199,14 @@ class CSHardwareSimulatingServer(LabradServer):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
+        yield active_device.lock.acquire()
         active_device.reset_output_buffer()
-        
+        active_device.lock.release()
         
     @setting(61, 'Select Device', node='s', address='i', returns='')
     def select_device(self,c,node,address):
         c['Device']=self.devices[(node,address)]
-
+    
       
     @setting(62, 'Deselect Device',returns='')
     def deselect_device(self,c):    
@@ -264,28 +275,35 @@ class CSHardwareSimulatingServer(LabradServer):
         
     @setting(110, "Add Simulated Wire",out_node='s',out_address='i',out_channel='i',in_node='s',in_address='i',in_channel='i')
     def add_simulated_wire(self,c,out_node,out_address,out_channel,in_node,in_address,in_channel):
-        out_dev=(out_node,out_address)
-        in_dev=(in_node,in_address)
-        #if out_dev not in self.devices or in_dev not in self.devices:
-        #raise HSSError(1)
-       # try:
-        out_conn=self.devices[out_dev].channels[out_channel-1]
-        in_conn=self.devices[in_dev].channels[in_channel-1]
+        out_dev=self.devices[(out_node,out_address)]
+        in_dev=self.devices[(in_node,in_address)]
+        yield out_dev.lock.acquire()
+        yield in_dev.lock.acquire()
+        #out_dev_lock= out_dev.lock.acquire()
+        #in_dev_lock=in_dev.lock.acquire()
+        #yield DeferredList([out_dev_lock,in_dev_lock])
+        out_conn=out_dev.channels[out_channel-1]
+        in_conn=in_dev.channels[in_channel-1]
         in_conn.plug_in(out_conn)
-       # except:
-            #raise HSSError(1)
-            
-        
+        in_dev.lock.release()
+        out_dev.lock.release()
            
     
-    @setting(111, "Remove Simulated Wire",in_node='s',in_address='i',in_channel='i')
-    def remove_simulated_wire(self,c,in_node,in_address,in_channel):
-        in_dev=(in_node,in_address)
-        #try:
-        in_conn=self.devices[in_dev].channels[in_channel-1]
+    @setting(111, "Remove Simulated Wire",out_node='s',out_address='i',out_channel='i',in_node='s',in_address='i',in_channel='i')
+    def remove_simulated_wire(self,c,out_node,out_address,out_channel,in_node,in_address,in_channel):
+        out_dev=self.devices[(out_node,out_address)]
+        in_dev=self.devices[(in_node,in_address)]
+        yield out_dev.lock.acquire()
+        yield in_dev.lock.acquire()
+        #out_dev_lock=out_dev.lock.acquire()
+        #in_dev_lock=in_dev.lock.acquire()
+        #yield DeferredList([out_dev_lock,in_dev_lock])
+        in_conn=in_dev.channels[in_channel-1]
         in_conn.unplug()
-        #except:
-            #raise HSSError(1)
+        in_dev.lock.release()
+        out_dev.lock.release()
+        
+
             
     @setting(121, "List Buses",returns='*s')
     def list_buses(self,c):
@@ -294,9 +312,7 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(122, "List Devices", bus='s', returns='*(iss)')
     def list_devices(self,c,bus):
         return [(loc[1],dev.name,dev.description) for loc,dev in self.devices.items() if loc[0]==bus]
-        
-    
-    
+
     def serverConnected(self, ID, name):
         """
         Attempt to connect to last connected serial bus server upon server connection.
