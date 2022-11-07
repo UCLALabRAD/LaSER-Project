@@ -63,7 +63,7 @@ class CSSerialServer(CSPollingServer):
             self.ctxt=context
             self.ser=hss
             self.input_buffer=bytearray(b'')
-            
+            self.error_list=[]
             
             self.open= lambda: self.ser.select_device(node, int(self.name[-1]), context=self.ctxt)
             self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
@@ -74,6 +74,7 @@ class CSSerialServer(CSPollingServer):
             
                 
             self.buff_lock=DeferredLock()
+            self.err_list_lock=DeferredLock()
             self.active_device_connections.append(self.name)
             if self.ser:
                 self.open()
@@ -113,11 +114,21 @@ class CSSerialServer(CSPollingServer):
             else:
                 return b''
         
+        @inlineCallbacks
+        def get_error_list(self):
+            yield self.err_list_lock.acquire()
+            val=list(self.error_list)
+            self.error_list=[]
+            self.err_list_lock.release()
+            returnValue(val)
+        
         def write(self,data):
             self.ser.simulated_write(data,context=self.ctxt)
             d=self.ser.simulated_read(context=self.ctxt)
             d.addCallback(lambda x: x.encode())
             d.addCallback(self.addtoBuffer)
+            d=self.ser.get_device_error_list(context=self.ctxt)
+            d.addCallback(self.add_to_error_list)
             #print(int(len(data)))
             #return int(len(data))
             
@@ -128,7 +139,13 @@ class CSSerialServer(CSPollingServer):
             self.input_buffer.extend(data)
             #print(self.input_buffer)
             self.buff_lock.release()
-
+            
+        @inlineCallbacks
+        def add_to_error_list(self,err_list):
+            yield self.err_list_lock.acquire()
+            self.error_list.extend(err_list)
+            self.err_list_lock.release()
+            
         @property
         def baudrate(self):
             return self.ser.baudrate(None,context=self.ctxt)
@@ -651,6 +668,14 @@ class CSSerialServer(CSPollingServer):
         if self.HSS:
             yield self.HSS.remove_device(self.name,port)
 
+
+    @setting(80, 'Get Device Errors', returns='*(vss)')
+    def get_device_errors(self, c):
+        ser = self.getPort(c)
+        resp=yield ser.get_error_list()
+        returnValue(resp)
+        
+        
 
     # SIGNALS
     @inlineCallbacks

@@ -122,11 +122,10 @@ class SimulatedFunctionGeneratorSignal(SimulatedOutSignal):
     
 class SignalLog(object):
     def __init__(self):
-        self.lock=threading.Lock
+        self.lock=threading.Lock()
         self.log=[]
         self.record_time_length=None
-        #self.lock needed???
-        
+
     def update(self, new_func):
         if not self.record_time_length:
             return

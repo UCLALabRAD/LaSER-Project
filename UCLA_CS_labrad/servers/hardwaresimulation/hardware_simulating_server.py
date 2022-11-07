@@ -44,15 +44,6 @@ class HSSError(Exception):
         if self.code in self.errorDict:
             return self.errorDict[self.code]
             
-class SimulatedDeviceError(Exception):
-    errorDict ={0:'Serial command not supaddressed by device.', 1: 'Unsupaddressed Value for Serial Connection Parameter'}
-
-    def __init__(self, code):
-        self.code = code
-
-    def __str__(self):
-        if self.code in self.errorDict:
-            return self.errorDict[self.code]
             
 SimInstrModel = collections.namedtuple('SimInstrModel', ['name','version','description','cls'])
 
@@ -313,6 +304,18 @@ class CSHardwareSimulatingServer(LabradServer):
     def list_devices(self,c,bus):
         return [(loc[1],dev.name,dev.description) for loc,dev in self.devices.items() if loc[0]==bus]
 
+
+    @setting(130, "Get Device Error List", returns='*(vss)')
+    def get_device_error_list(self,c):
+        if not c['Device']:
+            raise HSSError(1)
+        active_device=c['Device']
+        yield active_device.lock.acquire()
+        err_list=list(active_device.error_list)
+        active_device.error_list=[]
+        active_device.lock.release()
+        returnValue(err_list)
+    
     def serverConnected(self, ID, name):
         """
         Attempt to connect to last connected serial bus server upon server connection.

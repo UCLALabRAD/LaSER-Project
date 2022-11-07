@@ -1,6 +1,25 @@
 
 from twisted.internet.defer import inlineCallbacks, returnValue, DeferredLock
 from twisted.internet.threads import deferToThread
+import time
+
+class SimulatedDeviceError(Exception):
+
+    user_defined_errors={}
+    
+    base_error_dict={0: 'Wrong number of arguments-expected {:d}, got {}',1: 'Value {} for serial communication parameter {} not supported.',2: 'Command not recognized: {}', 3: 'GPIB Query {} returned empty string.',4: 'Type of parameter {} is {} but should be {}', 5:'Value of {} for {} out of range'}
+    def __init__(self, code,parameters=[]):
+        self.code = code
+        self.errorDict =dict(self.base_error_dict)
+        self.errorDict.update(self.user_defined_errors)
+        self.parameters=parameters
+    
+    
+
+    def __str__(self):
+        if self.code in self.errorDict:
+            return self.errorDict[self.code].format(*self.parameters)
+            
 
 class DeviceCommInterface(object):
 
@@ -11,6 +30,7 @@ class DeviceCommInterface(object):
         self.dev=dev
         self.max_buffer_size=1000
         self.lock=DeferredLock()
+        self.error_list=[]
 
  
     def read(self):
@@ -155,21 +175,19 @@ class SerialDeviceCommInterface(DeviceCommInterface):
         self.output_buffer=rest
         for cmd in cmds:
             command_interpretation=None
-            #try:
-            command_interpretation= yield deferToThread(lambda:self.interpret_serial_command(cmd))
+            try:
+                command_interpretation= yield deferToThread(lambda:self.interpret_serial_command(cmd))
                 #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
                     #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
                     #error
-            #except Exception as e:
-                #if debug mode, add to list
-                #raise e
-                #break
+            except SimulatedDeviceError as e:
+                self.error_list.append((time.time(),cmd.decode(),str(e)))
                 
             
-            #else:
-            if command_interpretation:
-                command_interpretation=command_interpretation+self.dev.output_termination_byte
-            self.input_buffer.extend(command_interpretation)
+            else:
+                if command_interpretation:
+                    command_interpretation=command_interpretation+self.dev.output_termination_byte
+                self.input_buffer.extend(command_interpretation)
         
 
         
@@ -363,7 +381,7 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
             
                 self.input_buffer=bytearray(b'')
                 #if debug mode, error
-                raise e
+                
                 
             
                 break
