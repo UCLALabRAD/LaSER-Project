@@ -228,6 +228,7 @@ class CSSerialDeviceServer(LabradServer):
             self.buffer_size = lambda size: ser.buffer_size(size,context=self.ctxt)
             self.buffer_input_waiting = lambda: ser.in_waiting(context=self.ctxt)
             self.buffer_output_waiting = lambda: ser.out_waiting(context=self.ctxt)
+            self.get_simulated_device_errors= lambda:ser.get_device_errors(context=self.ctxt)
 
 
     # SETUP
@@ -538,3 +539,19 @@ class CSSerialDeviceServer(LabradServer):
             yield c['Serial Connection'].flush_output()
         finally:
             c['Serial Connection'].release()
+
+
+    # HELPER
+    @setting(222235, 'Get Simulated Device Errors', returns='*(vss)')
+    def get_simulated_device_errors(self, c):
+        """
+        Flush the serial input and output buffers.
+        """
+        yield c['Serial Connection'].acquire()
+        try:
+            resp=yield c['Serial Connection'].get_simulated_device_errors()
+            
+
+        finally:
+            c['Serial Connection'].release()
+        returnValue(resp)

@@ -7,7 +7,7 @@ class SimulatedDeviceError(Exception):
 
     user_defined_errors={}
     
-    base_error_dict={0: 'Wrong number of arguments-expected {:d}, got {}',1: 'Value {} for serial communication parameter {} not supported.',2: 'Command not recognized: {}', 3: 'GPIB Query {} returned empty string.',4: 'Type of parameter {} is {} but should be {}', 5:'Value of {} for {} out of range'}
+    base_error_dict={1: 'Value {} for serial communication parameter {} not supported.',2: 'Command not recognized', 3: 'GPIB Query returned empty string.',4: 'Type of parameter {} is {} but should be {}', 5:'Value of {} for {} out of range'}
     def __init__(self, code,parameters=[]):
         self.code = code
         self.errorDict =dict(self.base_error_dict)
@@ -143,8 +143,7 @@ class SerialDeviceCommInterface(DeviceCommInterface):
                 else:
                     return bytearray(b'')
                 
-        #Error if in debug mode?
-        return bytearray(b'')
+        raise SimulatedDeviceError(2)
     
 
     def read(self,count=None):

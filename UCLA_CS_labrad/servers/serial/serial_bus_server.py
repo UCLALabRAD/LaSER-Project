@@ -68,7 +68,7 @@ class CSSerialServer(CSPollingServer):
             self.open= lambda: self.ser.select_device(node, int(self.name[-1]), context=self.ctxt)
             self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
             
-            
+            self.get_error_list=lambda: self.ser.get_device_error_list(context=self.ctxt)
             self.set_buffer_size= lambda size: self.ser.set_buffer_size(context=self.ctxt)
             
             
@@ -114,21 +114,12 @@ class CSSerialServer(CSPollingServer):
             else:
                 return b''
         
-        @inlineCallbacks
-        def get_error_list(self):
-            yield self.err_list_lock.acquire()
-            val=list(self.error_list)
-            self.error_list=[]
-            self.err_list_lock.release()
-            returnValue(val)
         
         def write(self,data):
             self.ser.simulated_write(data,context=self.ctxt)
             d=self.ser.simulated_read(context=self.ctxt)
             d.addCallback(lambda x: x.encode())
             d.addCallback(self.addtoBuffer)
-            d=self.ser.get_device_error_list(context=self.ctxt)
-            d.addCallback(self.add_to_error_list)
             #print(int(len(data)))
             #return int(len(data))
             
@@ -140,11 +131,6 @@ class CSSerialServer(CSPollingServer):
             #print(self.input_buffer)
             self.buff_lock.release()
             
-        @inlineCallbacks
-        def add_to_error_list(self,err_list):
-            yield self.err_list_lock.acquire()
-            self.error_list.extend(err_list)
-            self.err_list_lock.release()
             
         @property
         def baudrate(self):

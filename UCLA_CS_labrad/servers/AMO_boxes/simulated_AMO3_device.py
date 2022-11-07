@@ -6,7 +6,7 @@ from UCLA_CS_labrad.servers.hardwaresimulation.simulated_cables import Simulated
 
 __all__=['SimulatedAMO3']
 class SimulatedPiezoError(SimulatedDeviceError):
-    user_defined_errors={8:"Bad{:d}"}
+    user_defined_errors={8:"Bad{}and{}"}
 
 class SimulatedPiezo(SerialDeviceModel):
     name= None
@@ -50,8 +50,8 @@ class SimulatedPiezo(SerialDeviceModel):
         if (1<= channel <= 4):
             return (str(int(self.channels[channel-1].outputting)))
         else:
-            raise SimulatedPiezoError(5,[channel,"channel"])
-            #raise SimulatedPiezoError(8,[channel,"channel"])
+            #raise SimulatedPiezoError(5,[channel,"channel"])
+            raise SimulatedPiezoError(8,[channel,"channel"])
                     
                         
     def set_channel_status(self,channel,status):
