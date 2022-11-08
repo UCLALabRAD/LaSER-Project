@@ -324,18 +324,19 @@ class CSHardwareSimulatingServer(LabradServer):
         yield out_dev.lock.acquire()
         try:
             yield in_dev.lock.acquire()
-        finally:
+        except:
             out_dev.lock.release()
-        try:
-            #out_dev_lock= out_dev.lock.acquire()
-            #in_dev_lock=in_dev.lock.acquire()
-            #yield DeferredList([out_dev_lock,in_dev_lock])
-            out_conn=out_dev.channels[out_channel-1]
-            in_conn=in_dev.channels[in_channel-1]
-            in_conn.plug_in(out_conn)
-        finally:
-            in_dev.lock.release()
-            out_dev.lock.release()
+        else:
+            try:
+                #out_dev_lock= out_dev.lock.acquire()
+                #in_dev_lock=in_dev.lock.acquire()
+                #yield DeferredList([out_dev_lock,in_dev_lock])
+                out_conn=out_dev.channels[out_channel-1]
+                in_conn=in_dev.channels[in_channel-1]
+                in_conn.plug_in(out_conn)
+            finally:
+                in_dev.lock.release()
+                out_dev.lock.release()
            
     
     @setting(111, "Remove Simulated Wire",out_node='s',out_address='i',out_channel='i',in_node='s',in_address='i',in_channel='i')
@@ -345,17 +346,18 @@ class CSHardwareSimulatingServer(LabradServer):
         yield out_dev.lock.acquire()
         try:
             yield in_dev.lock.acquire()
-        finally:
+        except:
             out_dev.lock.release()
-        try:
-            #out_dev_lock=out_dev.lock.acquire()
-            #in_dev_lock=in_dev.lock.acquire()
-            #yield DeferredList([out_dev_lock,in_dev_lock])
-            in_conn=in_dev.channels[in_channel-1]
-            in_conn.unplug()
-        finally:
-            in_dev.lock.release()
-            out_dev.lock.release()
+        else:
+            try:
+                #out_dev_lock=out_dev.lock.acquire()
+                #in_dev_lock=in_dev.lock.acquire()
+                #yield DeferredList([out_dev_lock,in_dev_lock])
+                in_conn=in_dev.channels[in_channel-1]
+                in_conn.unplug()
+            finally:
+                in_dev.lock.release()
+                out_dev.lock.release()
         
 
             

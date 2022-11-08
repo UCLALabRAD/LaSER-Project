@@ -320,6 +320,7 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
                         resp= self.dev.execute_command(func,args_list)
                         
                         return resp
+            print(cmd)        
             raise Exception()
             
         

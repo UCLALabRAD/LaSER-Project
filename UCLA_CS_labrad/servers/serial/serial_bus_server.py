@@ -352,7 +352,7 @@ class CSSerialServer(CSPollingServer):
         if data:
             ser.baudrate=data
         resp= ser.baudrate
-        return int(resp)
+        return resp
     
     @setting(32, 'Bytesize', data=[': Query current bytesize', 'w: Set bytesize'], returns='w: Selected bytesize')
     def bytesize(self, c, data=None):

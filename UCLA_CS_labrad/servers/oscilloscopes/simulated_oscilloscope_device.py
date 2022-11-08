@@ -45,7 +45,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     def measure_average(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.window_vertical_scale,self.channel_positions[chan-1])
         return str(self.calc_av_from_waveform(waveform))
         
     def calc_av_from_waveform(self,waveform):
@@ -57,7 +57,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     def measure_peak_to_peak(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.window_vertical_scale,self.channel_positions[chan-1])
         return str(self.calc_p2p_from_waveform(waveform))
         
     def calc_p2p_from_waveform(self,waveform):
@@ -71,7 +71,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     def measure_frequency(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.window_vertical_scale,self.channel_positions[chan-1])
         return str(self.calc_freq_from_waveform(waveform))
         
     def calc_freq_from_waveform(self,waveform):
@@ -105,18 +105,15 @@ class SimulatedOscilloscope(GPIBDeviceModel):
 
     
     def autoscale(self): #TODO: put all active channels in window utilizing ver_positions. Currently will turn on/off each channel based on eligibility, but scales to first eligible channel, disregarding others.
-        self.window_horizontal_position=self.max_window_horizontal_scale*5
-        self.window_horizontal_scale=.5
+        self.window_horizontal_position=0.0
+        self.window_horizontal_scale=1.0
         self.window_vertical_scale=self.max_window_vertical_scale
-        new_window_horizontal_scale=None
-        new_window_vertical_scale=None
-        new_channel_vertical_position=None
         scaled=False
         for chan in range(len(self.channels)):
             if not scaled:
                 self.channel_positions[chan-1]=0.0
             self.channels[chan-1].is_on=True
-            waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
+            waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.window_vertical_scale,self.channel_positions[chan-1])
             freq=self.calc_freq_from_waveform(waveform)
             if not scaled:
                 avg=self.calc_av_from_waveform(waveform)
@@ -152,11 +149,7 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscope):
         (b':CHANnel2:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'2')),
         (b':CHANnel3:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'3')),
         (b':CHANnel4:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'4')),
-        (b':TEST:HI:THERE'):None,
-        (b':TEST:HI:HERE'):None,
-        (b':TEST:HEY:THERE'):None,
-        (b':TEST:HEY:HERE'):None
-        
+		(b':MEASure:CLEar',0): None
         }
         
  

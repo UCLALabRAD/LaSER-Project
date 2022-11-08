@@ -186,7 +186,6 @@ class SimulatedInSignal(object):
     def generate_waveform(self,horiz_scale,horiz_pos, vert_scale,vert_pos):
         if not self.is_on or (not self.input_signal_log):
             return None
-            
         window_horiz_start=horiz_pos+(self.record_time_length/2.0)-(horiz_scale*5)
         window_horiz_end=horiz_pos+(self.record_time_length/2.0)+(horiz_scale*5)
         window_vert_start=vert_scale*(-4)
