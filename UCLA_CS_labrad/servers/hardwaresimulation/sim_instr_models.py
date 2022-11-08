@@ -335,7 +335,7 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
             
         return resp
         
-    
+    @inlineCallbacks
     def write(self,data):
         
         if data[:1].decode()==':':
@@ -346,10 +346,10 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
             #buffer overflow error
         else:
             self.output_buffer.extend(data)
-        self.process_commands()
+        yield self.process_commands()
             
         
-    
+    @inlineCallbacks
     def process_commands(self):
         self.input_buffer=bytearray(b'')
         chained_cmds =self.output_buffer.split(self.dev.input_termination_byte)
@@ -360,19 +360,12 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
         for cmd in expanded_commands:
             command_interpretation=None
             try:
-                
-                command_interpretation= self.interpret_serial_command(cmd)
+                command_interpretation= yield deferToThread(lambda:self.interpret_serial_command(cmd))
                 #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
                     #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
                     #error
-            except Exception as e:
-                raise e
-                self.input_buffer=bytearray(b'')
-                #if debug mode, error
-                
-                
-            
-                break
+            except SimulatedDeviceError as e:
+                self.error_list.append((str(dt.now()),cmd.decode(),str(e)))
             
             else:
                 if command_interpretation:

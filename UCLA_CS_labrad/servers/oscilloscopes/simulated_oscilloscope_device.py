@@ -46,44 +46,51 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
         waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
+        return str(self.calc_av_from_waveform(waveform))
+        
+    def calc_av_from_waveform(self,waveform):
         if not waveform:
-            return str(0.0)
+            return 0.0
         else:
-            return str(np.average(waveform))
+            return np.average(waveform)
         
     def measure_peak_to_peak(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
         waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
+        return str(self.calc_p2p_from_waveform(waveform))
+        
+    def calc_p2p_from_waveform(self,waveform):
         if not waveform:
-            return str(0.0)
+            return 0.0
         else:
             max=np.amax(waveform)
             min=np.amin(waveform)
-            return str(max-min)
-        
+            return max-min
         
     def measure_frequency(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
         waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
+        return str(self.calc_freq_from_waveform(waveform))
+        
+    def calc_freq_from_waveform(self,waveform):
         if not waveform:
-            return str(1000000)
+            return 1000000
         else:
             wavelength_starts=self.find_where_crossing(waveform)
             if len(wavelength_starts)==0:
-                return str(1000000)
+                return 1000000
             elif len(wavelength_starts)==1:
-                return str(0)
+                return 0
             first_cross=wavelength_starts[0]
             last_cross=wavelength_starts[-1]
             crosses=len(wavelength_starts)-1
             fraction_used=(last_cross-first_cross)/(len(waveform))
             window_horiz_time_length=self.window_horizontal_scale*10
-            return str(crosses/(window_horiz_time_length*fraction_used))
+            return crosses/(window_horiz_time_length*fraction_used)
         
     def find_where_crossing(self,waveform):
-        
         max=np.amax(waveform)
         min=np.amin(waveform)
         halfway=(max+min)/2.0
@@ -108,10 +115,12 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         for chan in range(len(self.channels)):
             if not scaled:
                 self.channel_positions[chan-1]=0.0
-            freq=float(self.measure_frequency(bytearray(str(chan).encode())))
+            self.channels[chan-1].is_on=True
+            waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
+            freq=self.calc_freq_from_waveform(waveform)
             if not scaled:
-                avg=float(self.measure_average(bytearray(str(chan).encode())))
-            p2p=float(self.measure_peak_to_peak(bytearray(str(chan).encode())))
+                avg=self.calc_av_from_waveform(waveform)
+            p2p=self.calc_p2p_from_waveform(waveform)
             
             if ((freq<.5) or (p2p<.01)):
                 self.channels[chan-1].is_on=False
