@@ -19,6 +19,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     max_window_vertical_scale=None
     points_in_record_count=None
     
+    
     def __init__(self):
         super().__init__()
         self.channels=[]
@@ -27,10 +28,10 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         self.set_default_settings()
             
     def set_default_settings(self):
-        self.window_horizontal_scale=1
-        self.window_vertical_scale=1
-        self.window_horizontal_position=0
-        #self.window_vertical_position=0
+        self.window_horizontal_scale=1.0
+        self.window_vertical_scale=1.0
+        self.window_horizontal_position=0.0
+        self.channel_positions=[0.0]*4
         
     def toggle_channel(self,channel,val=None):
         if val:
@@ -44,7 +45,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     def measure_average(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.window_vertical_scale)
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
         if not waveform:
             return str(0.0)
         else:
@@ -53,7 +54,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     def measure_peak_to_peak(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform()
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
         if not waveform:
             return str(0.0)
         else:
@@ -65,7 +66,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     def measure_frequency(self,chan):
         chan=int(chan[-1:])
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.window_vertical_scale)
+        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_vertical_scale,self.window_horizontal_position,self.channel_positions[chan-1])
         if not waveform:
             return str(1000000)
         else:
@@ -91,53 +92,36 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         pos_changes=np.nonzero(np.diff(where_pos)==1)
         return pos_changes[0]
     
+    
         
         
 
     
-    def autoscale(self):
-	    pass
-	    '''
+    def autoscale(self): #TODO: put all active channels in window utilizing ver_positions. Currently will turn on/off each channel based on eligibility, but scales to first eligible channel, disregarding others.
         self.window_horizontal_position=self.max_window_horizontal_scale*5
-        horiz_scale_new_window=0
-        vert_position_new_window=0
-        vert_scale_new_window=5
-        
-        for channel in self.channels:
-            waveform=self.channels[chan-1].generate_waveform()
+        self.window_horizontal_scale=.5
+        self.window_vertical_scale=self.max_window_vertical_scale
+        new_window_horizontal_scale=None
+        new_window_vertical_scale=None
+        new_channel_vertical_position=None
+        scaled=False
+        for chan in range(len(self.channels)):
+            if not scaled:
+                self.channel_positions[chan-1]=0.0
+            freq=float(self.measure_frequency(bytearray(str(chan).encode())))
+            if not scaled:
+                avg=float(self.measure_average(bytearray(str(chan).encode())))
+            p2p=float(self.measure_peak_to_peak(bytearray(str(chan).encode())))
             
-            max=np.amax(waveform)
-            min=np.amin(waveform)
-            halfway=(max+min)/2.0
-            
-            cross_array=np.diff(np.sign(waveform-halfway)==1)
-            wavelength_starts=np.nonzero(cross_array)
-            crosses=len(wavelength_starts)-1
-            freq=crosses/((last_cross-first_cross)/(len(waveform))*self.window_horizontal_scale*10)
-            if ((freq<1) or (max-min)<.2):
-                channel.is_on=False
+            if ((freq<.5) or (p2p<.01)):
+                self.channels[chan-1].is_on=False
             else:
-            if measure_frequency()<10 or measure)peak_to_peak
-            if channel.input_signal_log:
-            else:
-                channel.is_on=False
-        
-        
-        
-            
-        
-        wavelength_starts=self.find_where_crossing(waveform)
-        if len(wavelength_starts)>3:
-            
-        elif len(wavelength_starts<3:
-        
-        else:
-         break
-        
-        
-        #get waveforms for all channels, get max,min, where waves clipped if clipped, horizontally?
-        return
-        '''
+               if not scaled:
+                   scaled=True
+                   self.channel_positions[chan-1]=self.channel_positions[chan-1]-avg
+                   self.window_vertical_scale=p2p/4.0 #will be centered and take up 4 divisions / 8 vertical divisions
+                   self.window_horizontal_scale=.1*2.0*(1/freq) #try to show 2 wavelengths over 10 horizontal divisions
+
 
 class SimulatedKeysightDSOX2024A(SimulatedOscilloscope):
     name= 'KeysightDSOX2024A'

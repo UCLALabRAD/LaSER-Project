@@ -183,14 +183,14 @@ class SimulatedInSignal(object):
         
             
            
-    def generate_waveform(self,horiz_scale,horiz_pos, vert_scale):#,vert_pos):
+    def generate_waveform(self,horiz_scale,horiz_pos, vert_scale,vert_pos):
         if not self.is_on or (not self.input_signal_log):
             return None
             
         window_horiz_start=horiz_pos+(self.record_time_length/2.0)-(horiz_scale*5)
         window_horiz_end=horiz_pos+(self.record_time_length/2.0)+(horiz_scale*5)
-        window_vert_start=vert_scale*(-5)
-        window_vert_end=5*vert_scale
+        window_vert_start=vert_scale*(-4)
+        window_vert_end=4*vert_scale
         current_time=time.time()
         record_start_time=current_time-self.record_time_length
         self.input_signal_log.lock.acquire()
@@ -208,5 +208,5 @@ class SimulatedInSignal(object):
             if not seg[1]:
                 waveform.extend(np.zeros(len(arr)))
             else:
-                waveform.extend(seg[1](arr-seg[0]).clip(window_vert_start,window_vert_end))
+                waveform.extend((seg[1](arr-seg[0])+vert_pos).clip(window_vert_start,window_vert_end))
         return waveform

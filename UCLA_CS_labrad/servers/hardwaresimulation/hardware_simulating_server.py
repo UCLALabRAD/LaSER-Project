@@ -112,9 +112,11 @@ class CSHardwareSimulatingServer(LabradServer):
             return None
         active_device=c['Device']
         yield active_device.lock.acquire()
-        resp=active_device.read(count)
-        active_device.lock.release()
-        return resp.decode()
+        try:
+            resp=active_device.read(count)
+        finally:
+            active_device.lock.release()
+        returnValue(resp.decode())
         
 
     @setting(14, 'Simulated Write', data='s', returns='i')
@@ -123,9 +125,11 @@ class CSHardwareSimulatingServer(LabradServer):
             return None
         active_device=c['Device']
         yield active_device.lock.acquire()
-        yield active_device.write(data.encode())
-        active_device.lock.release()
-        return len(data)
+        try:
+            yield active_device.write(data.encode())
+        finally:
+            active_device.lock.release()
+        returnValue(len(data))
         
 
         
@@ -162,8 +166,12 @@ class CSHardwareSimulatingServer(LabradServer):
     def get_in_waiting(self,c):
         if not c['Device']:
             raise HSSError(1)
-        active_device=c['Device']
-        return len(active_device.input_buffer)
+        yield active_device.lock.acquire()
+        try:
+            buf_len=len(active_device.input_buffer)
+        finally:
+            active_device.lock.release()
+        returnValue(buf_len)
     
     @setting(42, 'Get Out-Waiting', returns='i')
     def get_out_waiting(self,c):
@@ -171,8 +179,11 @@ class CSHardwareSimulatingServer(LabradServer):
             raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
-        buf_len=len(active_device.output_buffer)
-        active_device.lock.release()
+        try:
+            buf_len=len(active_device.output_buffer)
+        finally:
+            active_device.lock.release()
+        returnValue(buf_len)
     
     
     @setting(51, 'Reset Input Buffer', returns='')
@@ -181,8 +192,10 @@ class CSHardwareSimulatingServer(LabradServer):
             raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
-        active_device.reset_input_buffer()
-        active_device.lock.release()
+        try:
+            active_device.reset_input_buffer()
+        finally:
+            active_device.lock.release()
         
         
     @setting(52, 'Reset Output Buffer', returns='')
@@ -191,8 +204,10 @@ class CSHardwareSimulatingServer(LabradServer):
             raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
-        active_device.reset_output_buffer()
-        active_device.lock.release()
+        try:
+            active_device.reset_output_buffer()
+        finally:
+            active_device.lock.release()
         
     @setting(61, 'Select Device', node='s', address='i', returns='')
     def select_device(self,c,node,address):
@@ -207,52 +222,89 @@ class CSHardwareSimulatingServer(LabradServer):
     @setting(71, 'Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
     def baudrate(self,c,val):
         active_device=c['Device']
-        if val:
-            active_device.comm_baudrate=val
-        return active_device.comm_baudrate
+        yield active_device.lock.acquire()
+        try:
+            if val:
+                active_device.comm_baudrate=val
+            resp=active_device.comm_baudrate
+        finally:
+            active_device.lock.release()
+        return resp
         
     @setting(72, 'Bytesize',val=[': Query current stopbits', 'w: Set bytesize'], returns='w: Selected bytesize')
     def bytesize(self,c,val):
         active_device=c['Device']
-        if val:
-            active_device.comm_bytesize=val
-        return active_device.comm_bytesize
+        yield active_device.lock.acquire()
+        try:
+            if val:
+                active_device.comm_bytesize=val
+            resp=active_device.comm_bytesize
+        finally:
+            active_device.lock.release()
+        return resp
         
     @setting(73, 'Parity', val=[': Query current parity', 'w: Set parity'], returns='w: Selected parity')
     def parity(self,c,val):
         active_device=c['Device']
-        if val:
-            active_device.comm_parity=val
-        return active_device.comm_parity
+        yield active_device.lock.acquire()
+        try:
+            if val:
+                active_device.comm_parity=val
+            resp=active_device.comm_parity
+        finally:
+            active_device.lock.release()
+        return resp
         
     @setting(74, 'Stopbits', val=[': Query current stopbits', 'w: Set stopbits'], returns='w: Selected stopbits')
     def stopbits(self,c,val):
         active_device=c['Device']
-        if val:
-            active_device.comm_stopbits=val
-        return active_device.comm_stopbits
+        yield active_device.lock.acquire()
+        try:
+            if val:
+                active_device.comm_stopbits=val
+            resp=active_device.comm_stopbits
+        finally:
+            active_device.lock.release()
+        return resp
         
     @setting(75, 'RTS', val='b', returns='b')
     def rts(self,c,val):
         active_device=c['Device']
-        if val:
-            active_device.comm_rts=val
-        return active_device.comm_rts
+        yield active_device.lock.acquire()
+        try:
+            if val:
+                active_device.comm_rts=val
+            resp=active_device.comm_rts
+        finally:
+            active_device.lock.release()
+        return rts
         
     @setting(76, 'DTR', val='b', returns='b')
     def dtr(self,c,val):
         active_device=c['Device']
-        if val:
-            active_device.comm_dtr=val
-        return active_device.comm_dtr
+        yield active_device.lock.acquire()
+        try:
+            if val:
+                active_device.comm_dtr=val
+            resp=active_device.comm_dtr
+        finally:
+            active_device.lock.release()
+        return resp
         
-    @setting(81, 'Buffer Size',returns='')
-    def buffer_size(self,c,size):
+    @setting(81, 'Buffer Size',returns='w')
+    def buffer_size(self,c,size=None):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
-        active_device.buffer_size=size
-        return active_device.buffer_size
+        yield active_device.lock.acquire()
+        try:
+             if size:
+                 active_device.buffer_size=size
+             resp=active_device.buffer_size
+             
+        finally:
+             active_device.buffer_size.release()
+        returnValue(resp)
         
       
     @setting(92, 'Get Available Device Types',returns='*(ssb)')
@@ -268,16 +320,22 @@ class CSHardwareSimulatingServer(LabradServer):
     def add_simulated_wire(self,c,out_node,out_address,out_channel,in_node,in_address,in_channel):
         out_dev=self.devices[(out_node,out_address)]
         in_dev=self.devices[(in_node,in_address)]
+        
         yield out_dev.lock.acquire()
-        yield in_dev.lock.acquire()
-        #out_dev_lock= out_dev.lock.acquire()
-        #in_dev_lock=in_dev.lock.acquire()
-        #yield DeferredList([out_dev_lock,in_dev_lock])
-        out_conn=out_dev.channels[out_channel-1]
-        in_conn=in_dev.channels[in_channel-1]
-        in_conn.plug_in(out_conn)
-        in_dev.lock.release()
-        out_dev.lock.release()
+        try:
+            yield in_dev.lock.acquire()
+        finally:
+            out_dev.lock.release()
+        try:
+            #out_dev_lock= out_dev.lock.acquire()
+            #in_dev_lock=in_dev.lock.acquire()
+            #yield DeferredList([out_dev_lock,in_dev_lock])
+            out_conn=out_dev.channels[out_channel-1]
+            in_conn=in_dev.channels[in_channel-1]
+            in_conn.plug_in(out_conn)
+        finally:
+            in_dev.lock.release()
+            out_dev.lock.release()
            
     
     @setting(111, "Remove Simulated Wire",out_node='s',out_address='i',out_channel='i',in_node='s',in_address='i',in_channel='i')
@@ -285,14 +343,19 @@ class CSHardwareSimulatingServer(LabradServer):
         out_dev=self.devices[(out_node,out_address)]
         in_dev=self.devices[(in_node,in_address)]
         yield out_dev.lock.acquire()
-        yield in_dev.lock.acquire()
-        #out_dev_lock=out_dev.lock.acquire()
-        #in_dev_lock=in_dev.lock.acquire()
-        #yield DeferredList([out_dev_lock,in_dev_lock])
-        in_conn=in_dev.channels[in_channel-1]
-        in_conn.unplug()
-        in_dev.lock.release()
-        out_dev.lock.release()
+        try:
+            yield in_dev.lock.acquire()
+        finally:
+            out_dev.lock.release()
+        try:
+            #out_dev_lock=out_dev.lock.acquire()
+            #in_dev_lock=in_dev.lock.acquire()
+            #yield DeferredList([out_dev_lock,in_dev_lock])
+            in_conn=in_dev.channels[in_channel-1]
+            in_conn.unplug()
+        finally:
+            in_dev.lock.release()
+            out_dev.lock.release()
         
 
             
@@ -305,15 +368,17 @@ class CSHardwareSimulatingServer(LabradServer):
         return [(loc[1],dev.name,dev.description) for loc,dev in self.devices.items() if loc[0]==bus]
 
 
-    @setting(130, "Get Device Error List", returns='*(vss)')
+    @setting(130, "Get Device Error List", returns='*(sss)')
     def get_device_error_list(self,c):
         if not c['Device']:
             raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
-        err_list=list(active_device.error_list)
-        active_device.error_list=[]
-        active_device.lock.release()
+        try:
+            err_list=list(active_device.error_list)
+            active_device.error_list=[]
+        finally:
+            active_device.lock.release()
         returnValue(err_list)
     
     def serverConnected(self, ID, name):

@@ -1,13 +1,13 @@
 
 from twisted.internet.defer import inlineCallbacks, returnValue, DeferredLock
 from twisted.internet.threads import deferToThread
-import time
+from datetime import datetime as dt
 
 class SimulatedDeviceError(Exception):
 
     user_defined_errors={}
     
-    base_error_dict={1: 'Value {} for serial communication parameter {} not supported.',2: 'Command not recognized', 3: 'GPIB Query returned empty string.',4: 'Type of parameter {} is {} but should be {}', 5:'Value of {} for {} out of range'}
+    base_error_dict={1: 'Trying to communicate with device with {} of {}; expected {}.',2: 'Command not recognized', 3: 'GPIB Query returned empty string.',4: 'Type of parameter {} is {} but should be {}', 5:'Value of {} for {} out of range'}
     def __init__(self, code,parameters=[]):
         self.code = code
         self.errorDict =dict(self.base_error_dict)
@@ -110,28 +110,19 @@ class SerialDeviceCommInterface(DeviceCommInterface):
         self.comm_parity=None
         self.comm_stopbits=None
         self.comm_dtr=None
-        self.comm_rst=None
+        self.comm_rts=None
+        
 
     
     
-    def enforce_correct_communication_parameters(self):
-        if self.dev.required_baudrate and self.comm_baudrate!= self.dev.required_baudrate:
-                self.dev.incorrect_comm_param_handle("baudrate")
-        if self.dev.required_bytesize and self.comm_bytesize!= self.dev.required_bytesize:
-                self.dev.incorrect_comm_param_handle("bytesize")
-        if self.dev.required_parity and self.comm_parity!= self.dev.required_parity:
-                self.dev.incorrect_comm_param_handle("parity")
-        if self.dev.required_stopbits and self.comm_stopbits!= self.dev.required_stopbits:
-                self.dev.incorrect_comm_param_handle("stopbits")
-        if self.dev.required_dtr and self.comm_dtr!= self.dev.required_dtr:
-                self.dev.incorrect_comm_param_handle("dtr")
-        if self.dev.required_rts and self.comm_rts!= self.dev.required_rts:
-                self.dev.incorrect_comm_param_handle("rts")
+   
+                
     
         
         
     
     def interpret_serial_command(self, cmd):
+        self.dev.process_communication_parameters(self.comm_baudrate,self.comm_bytesize,self.comm_parity,self.comm_stopbits,self.comm_dtr,self.comm_rts)
         body,*args=cmd.split(b' ')
         for (spec_body,arg_counts),func in self.dev.command_dict.items():
             if type(arg_counts)==int:
@@ -164,7 +155,6 @@ class SerialDeviceCommInterface(DeviceCommInterface):
             #buffer overflow error
         else:
             self.output_buffer.extend(data)
-        self.enforce_correct_communication_parameters()
         yield self.process_commands()
         
 
@@ -180,7 +170,7 @@ class SerialDeviceCommInterface(DeviceCommInterface):
                     #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
                     #error
             except SimulatedDeviceError as e:
-                self.error_list.append((time.time(),cmd.decode(),str(e)))
+                self.error_list.append((str(dt.now()),cmd.decode(),str(e)))
                 
             
             else:
@@ -367,7 +357,6 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
         expanded_commands=[]
         for chained_cmd in chained_cmds:
             expanded_commands.extend(self.expand_chained_commands(chained_cmd))
-        print(expanded_commands)
         for cmd in expanded_commands:
             command_interpretation=None
             try:
@@ -377,7 +366,7 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
                     #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
                     #error
             except Exception as e:
-            
+                raise e
                 self.input_buffer=bytearray(b'')
                 #if debug mode, error
                 
@@ -396,9 +385,7 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
             self.input_buffer.extend(b'\n')
 
                 
-                
             
-    
     
     
     
@@ -429,16 +416,28 @@ class SerialDeviceModel(DeviceModel):
     required_parity=None
     required_stopbits=None
     required_dtr=None
-    required_rst=None
+    required_rts=None
 
     command_dict=None
 
-    def incorrect_comm_param_handle(self,param):
-        pass
     
         
     def set_default_settings(self):
         pass
+        
+    def process_communication_parameters(self,baudrate,bytesize,parity,stopbits,dtr,rts):
+        if self.required_baudrate and baudrate!= self.required_baudrate:
+                raise SimulatedDeviceError(1,["baudrate",baudrate,self.required_baudrate])
+        if self.required_bytesize and bytesize!= self.required_bytesize:
+                raise SimulatedDeviceError(1,["bytesize",bytesize,self.required_bytesize])
+        if self.required_parity and parity!= self.required_parity:
+                raise SimulatedDeviceError(1,["parity",parity,self.required_parity])
+        if self.required_stopbits and stopbits!= self.required_stopbits:
+                raise SimulatedDeviceError(1,["stopbits",stopbits,self.required_stopbits])
+        if self.required_dtr and dtr!= self.required_dtr:
+                raise SimulatedDeviceError(1,["dtr",dtr,self.required_dtr])
+        if self.required_rts and rts!= self.required_rts:
+                raise SimulatedDeviceError(1,["rts",rts,self.required_rts])
 
         
                 

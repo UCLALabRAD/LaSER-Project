@@ -542,7 +542,7 @@ class CSSerialDeviceServer(LabradServer):
 
 
     # HELPER
-    @setting(222235, 'Get Simulated Device Errors', returns='*(vss)')
+    @setting(222235, 'Get Simulated Device Errors', returns='*(sss)')
     def get_simulated_device_errors(self, c):
         """
         Flush the serial input and output buffers.

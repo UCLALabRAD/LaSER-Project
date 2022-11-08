@@ -655,7 +655,7 @@ class CSSerialServer(CSPollingServer):
             yield self.HSS.remove_device(self.name,port)
 
 
-    @setting(80, 'Get Device Errors', returns='*(vss)')
+    @setting(80, 'Get Device Errors', returns='*(sss)')
     def get_device_errors(self, c):
         ser = self.getPort(c)
         resp=yield ser.get_error_list()
