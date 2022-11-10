@@ -8,7 +8,8 @@ class SimulatedOutSignal(object):
         self.currently_outputting=False
         self.output_signal_log=SignalLog()
         self.current_signal_function=None
-
+        
+        
     def update_signal_function(self):
         self.current_signal_function=self.calculate_signal_function()
         if self.currently_outputting:
@@ -196,7 +197,8 @@ class SimulatedInSignal(object):
         self.input_signal_log.clip_record()
         record=[((self.input_signal_log.log[i][0]-record_start_time),self.input_signal_log.log[i][1]) for i in range(len(self.input_signal_log.log))]
         self.input_signal_log.lock.release()
-        if (record[0][0]>0.0):
+        
+        if (not record) or (record[0][0]>0.0):
             record.insert(0,(0.0,None))
         x_vals=np.linspace(window_horiz_start,window_horiz_end,self.points_in_memory)
         split_points=[rec[0] for rec in record]
