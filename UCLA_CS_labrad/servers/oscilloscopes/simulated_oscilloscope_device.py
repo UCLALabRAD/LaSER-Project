@@ -63,7 +63,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
     def toggle_channel(self,chan, val=None):
         chan=int(chan.decode())
         if val:
-            self.channels[chan-1].is_on=int(val.decode())
+            self.channels[chan-1].is_on=bool(int(val.decode()))
         else:
             return str(int(self.channels[chan-1].is_on))
         
@@ -147,9 +147,9 @@ class SimulatedOscilloscope(GPIBDeviceModel):
                 if (not low_elig_freq) or freq<low_elig_freq:
                     low_elig_freq=freq
                 self.channel_positions[chan-1]=self.channel_positions[chan-1]-avg
-                self.channel_scales[chan-1]=p2p/4.0 #will be centered and take up 4 divisions / 8 vertical divisions
+                self.channel_scales[chan-1]=min(p2p/4.0,self.max_channel_scale) #will be centered and take up 4 divisions / 8 vertical divisions
         if low_elig_freq:
-            self.window_horizontal_scale=.1*2.0*(1/low_elig_freq) #try to show 2 wavelengths over 10 horizontal divisions
+            self.window_horizontal_scale=min(.1*3.0*(1/low_elig_freq),self.max_window_horizontal_scale) #try to show 3 wavelengths over 10 horizontal divisions
         else:
             self.window_horizontal_scale=1.0
 
@@ -166,6 +166,7 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscope):
     command_dict={
         (b':MEASure:VAV?',1) : SimulatedOscilloscope.measure_average,
         (b':MEASure:FREQ?',1) : SimulatedOscilloscope.measure_frequency,
+        (b':MEASure:VPP?',1) : SimulatedOscilloscope.measure_peak_to_peak,
         (b':AUT',0) : SimulatedOscilloscope.autoscale,
         (b':CHANnel1:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,b'1',val)),
         (b':CHANnel2:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,b'2',val)),
