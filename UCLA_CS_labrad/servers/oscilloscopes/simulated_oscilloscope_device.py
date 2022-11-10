@@ -35,35 +35,35 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         
     def horizontal_scale(self,val=None):
         if val:
-            self.window_horizontal_scale=float(val.decode())
+            self.window_horizontal_scale=float(val)
         else:
             return str(self.window_horizontal_scale)
         
 
     def horizontal_position(self,val=None):
         if val:
-            self.window_horizontal_position=float(val.decode())
+            self.window_horizontal_position=float(val)
         else:
             return str(self.window_horizontal_position)
         
     def channel_scale(self,chan, val=None):
-        chan=int(chan.decode())
+        chan=int(chan)
         if val:
-            self.channel_scales[chan-1]=float(val.decode())
+            self.channel_scales[chan-1]=float(val)
         else:
             return str(self.channel_scales[chan-1])
         
     def channel_offset(self,chan, val=None):
-        chan=int(chan.decode())
+        chan=int(chan)
         if val:
-            self.channel_positions[chan-1]=-1*float(val.decode())
+            self.channel_positions[chan-1]=-1*float(val)
         else:
             return str(-1*self.channel_positions[chan-1])
     
     def toggle_channel(self,chan, val=None):
-        chan=int(chan.decode())
+        chan=int(chan)
         if val:
-            self.channels[chan-1].is_on=bool(int(val.decode()))
+            self.channels[chan-1].is_on=bool(int(val))
         else:
             return str(int(self.channels[chan-1].is_on))
         
@@ -71,7 +71,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
         pass
         
     def measure_average(self,chan):
-        chan=int(chan[-1:])
+        chan=int(chan[-1])
         self.channels[chan-1].is_on=True
         waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.channel_scales[chan-1],self.channel_positions[chan-1])
         return str(self.calc_av_from_waveform(waveform))
@@ -83,7 +83,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
             return np.average(waveform)
         
     def measure_peak_to_peak(self,chan):
-        chan=int(chan[-1:])
+        chan=int(chan[-1])
         self.channels[chan-1].is_on=True
         waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.channel_scales[chan-1],self.channel_positions[chan-1])
         return str(self.calc_p2p_from_waveform(waveform))
@@ -97,7 +97,7 @@ class SimulatedOscilloscope(GPIBDeviceModel):
             return max-min
         
     def measure_frequency(self,chan):
-        chan=int(chan[-1:])
+        chan=int(chan[-1])
         self.channels[chan-1].is_on=True
         waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.channel_scales[chan-1],self.channel_positions[chan-1])
         return str(self.calc_freq_from_waveform(waveform))
@@ -168,33 +168,33 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscope):
         (b':MEASure:FREQ?',1) : SimulatedOscilloscope.measure_frequency,
         (b':MEASure:VPP?',1) : SimulatedOscilloscope.measure_peak_to_peak,
         (b':AUT',0) : SimulatedOscilloscope.autoscale,
-        (b':CHANnel1:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,b'1',val)),
-        (b':CHANnel2:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,b'2',val)),
-        (b':CHANnel3:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,b'3',val)),
-        (b':CHANnel4:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,b'4',val)),
-        (b':CHANnel1:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,b'1')),
-        (b':CHANnel2:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,b'2')),
-        (b':CHANnel3:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,b'3')),
-        (b':CHANnel4:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,b'4')),
+        (b':CHANnel1:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'1',val)),
+        (b':CHANnel2:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'2',val)),
+        (b':CHANnel3:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'3',val)),
+        (b':CHANnel4:DISPlay',1): (lambda self, val: SimulatedOscilloscope.toggle_channel(self,'4',val)),
+        (b':CHANnel1:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'1')),
+        (b':CHANnel2:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'2')),
+        (b':CHANnel3:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'3')),
+        (b':CHANnel4:DISPlay?',0): (lambda self : SimulatedOscilloscope.toggle_channel(self,'4')),
 		(b':MEASure:CLEar',0): None,
         
-        (b':CHANnel1:OFFSet',1): (lambda self,val : SimulatedOscilloscope.channel_offset(self,b'1',val)),
-        (b':CHANnel2:OFFSet',1): (lambda self,val : SimulatedOscilloscope.channel_offset(self,b'2',val)),
-        (b':CHANnel3:OFFSet',1): (lambda self,val : SimulatedOscilloscope.channel_offset(self,b'3',val)),
-        (b':CHANnel4:OFFSet',1): (lambda self,val : SimulatedOscilloscope.channel_offset(self,b'4',val)),
-        (b':CHANnel1:OFFSet?',0): (lambda self : SimulatedOscilloscope.channel_offset(self,b'1')),
-        (b':CHANnel2:OFFSet?',0): (lambda self : SimulatedOscilloscope.channel_offset(self,b'2')),
-        (b':CHANnel3:OFFSet?',0): (lambda self : SimulatedOscilloscope.channel_offset(self,b'3')),
-        (b':CHANnel4:OFFSet?',0): (lambda self : SimulatedOscilloscope.channel_offset(self,b'4')),
+        (b':CHANnel1:OFFSet',1): (lambda self,val : SimulatedOscilloscope.channel_offset(self,'1',val)),
+        (b':CHANnel2:OFFSet',1): (lambda self,val : SimulatedOscilloscope.channel_offset(self,'2',val)),
+        (b':CHANnel3:OFFSet',1): (lambda self,val : SimulatedOscilloscope.channel_offset(self,'3',val)),
+        (b':CHANnel4:OFFSet',1): (lambda self,val : SimulatedOscilloscope.channel_offset(self,'4',val)),
+        (b':CHANnel1:OFFSet?',0): (lambda self : SimulatedOscilloscope.channel_offset(self,'1')),
+        (b':CHANnel2:OFFSet?',0): (lambda self : SimulatedOscilloscope.channel_offset(self,'2')),
+        (b':CHANnel3:OFFSet?',0): (lambda self : SimulatedOscilloscope.channel_offset(self,'3')),
+        (b':CHANnel4:OFFSet?',0): (lambda self : SimulatedOscilloscope.channel_offset(self,'4')),
         
-        (b':CHANnel1:SCALe',1): (lambda self,val : SimulatedOscilloscope.channel_scale(self,b'1',val)),
-        (b':CHANnel2:SCALe',1): (lambda self,val : SimulatedOscilloscope.channel_scale(self,b'2',val)),
-        (b':CHANnel3:SCALe',1): (lambda self,val : SimulatedOscilloscope.channel_scale(self,b'3',val)),
-        (b':CHANnel4:SCALe',1): (lambda self,val : SimulatedOscilloscope.channel_scale(self,b'4',val)),
-        (b':CHANnel1:SCALe?',0): (lambda self : SimulatedOscilloscope.channel_scale(self,b'1')),
-        (b':CHANnel2:SCALe?',0): (lambda self : SimulatedOscilloscope.channel_scale(self,b'2')),
-        (b':CHANnel3:SCALe?',0): (lambda self : SimulatedOscilloscope.channel_scale(self,b'3')),
-        (b':CHANnel4:SCALe?',0): (lambda self : SimulatedOscilloscope.channel_scale(self,b'4')),
+        (b':CHANnel1:SCALe',1): (lambda self,val : SimulatedOscilloscope.channel_scale(self,'1',val)),
+        (b':CHANnel2:SCALe',1): (lambda self,val : SimulatedOscilloscope.channel_scale(self,'2',val)),
+        (b':CHANnel3:SCALe',1): (lambda self,val : SimulatedOscilloscope.channel_scale(self,'3',val)),
+        (b':CHANnel4:SCALe',1): (lambda self,val : SimulatedOscilloscope.channel_scale(self,'4',val)),
+        (b':CHANnel1:SCALe?',0): (lambda self : SimulatedOscilloscope.channel_scale(self,'1')),
+        (b':CHANnel2:SCALe?',0): (lambda self : SimulatedOscilloscope.channel_scale(self,'2')),
+        (b':CHANnel3:SCALe?',0): (lambda self : SimulatedOscilloscope.channel_scale(self,'3')),
+        (b':CHANnel4:SCALe?',0): (lambda self : SimulatedOscilloscope.channel_scale(self,'4')),
         (b':TIMe:SCALe',1): SimulatedOscilloscope.horizontal_scale,
         (b':TIMe:SCALe?',0): SimulatedOscilloscope.horizontal_scale,
         (b':TIMe:POSition',1): SimulatedOscilloscope.horizontal_position,

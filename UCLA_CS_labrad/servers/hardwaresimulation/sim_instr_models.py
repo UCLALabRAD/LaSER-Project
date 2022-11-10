@@ -129,7 +129,7 @@ class SerialDeviceCommInterface(DeviceCommInterface):
                 arg_counts=[arg_counts]
             if body==spec_body and len(args) in arg_counts:
                 if func:
-                    resp=self.dev.execute_command(func,args)
+                    resp=self.dev.execute_command(func,[arg.decode() for arg in args])
                     return resp.encode()
                 else:
                     return bytearray(b'')
@@ -310,17 +310,15 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
                         return
                     if is_query:
                         
-                        resp= self.dev.execute_command(func,args_list)
+                        resp= self.dev.execute_command(func,[arg.decode() for arg in args_list])
                         if resp:
-                            return resp
+                            return resp.encode()
                         else:
                             raise Exception()
                     
                     else:
-                        resp= self.dev.execute_command(func,args_list)
-                        
-                        return resp
-            print(cmd)        
+                        self.dev.execute_command(func,[arg.decode() for arg in args_list])
+                        return
             raise Exception()
             
         
@@ -370,7 +368,7 @@ class GPIBDeviceCommInterface(DeviceCommInterface):
             
             else:
                 if command_interpretation:
-                    self.input_buffer.extend(command_interpretation.encode()+self.dev.output_termination_byte)
+                    self.input_buffer.extend(command_interpretation+self.dev.output_termination_byte)
                 
         
         if self.input_buffer:

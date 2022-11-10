@@ -28,9 +28,9 @@ class SimulatedFunctionGenerator(GPIBDeviceModel):
         
     def toggle(self,status=None):
         if status:
-            if status=='ON'.encode() or (status.decode().isnumeric() and int(status)==1):
+            if status=='ON' or (status.isnumeric() and int(status)==1):
                self.channels[0].outputting=True
-            elif status=='OFF'.encode() or (status.decode().isnumeric() and int(status)==0):
+            elif status=='OFF' or (status.isnumeric() and int(status)==0):
                self.channels[0].outputting=False
         else:
             return str(int(self.channels[0].outputting))
@@ -57,7 +57,7 @@ class SimulatedFunctionGenerator(GPIBDeviceModel):
             
     def function(self,func=None):
         if func:
-            self.channels[0].function=func.decode()
+            self.channels[0].function=func
         else:
             return self.channels[0].function
         
