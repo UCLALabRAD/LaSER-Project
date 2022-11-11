@@ -50,7 +50,7 @@ class cs_example_experiment_3(QsimExperiment):
         # required for script scanner to manage different instances
 
         # set up function generator
-        self.fg_server = cxn.cs_function_generator_server
+        self.fg_server = cxn.function_generator_server
         self.fg_server.select_device(self.p.example_parameters.Function_Generator_Name)
         self.fg_server.toggle(True)
 
@@ -98,7 +98,7 @@ class cs_example_experiment_3(QsimExperiment):
 if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()                  # creates LabRAD connection
-    scanner = cxn.cs_script_scanner             # connects to script scanner server
+    scanner = cxn.script_scanner             # connects to script scanner server
     exprt = cs_example_experiment_3(cxn=cxn)     # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)                    # executes the experiment

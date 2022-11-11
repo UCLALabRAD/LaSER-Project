@@ -1,10 +1,10 @@
 """
 ### BEGIN NODE INFO
 [info]
-name = CS Serial Server
+name = Serial Server
 version = 1.5.1
 description = Gives access to serial devices via pyserial.
-instancename = %LABRADNODE% CS Serial Server
+instancename = %LABRADNODE% Serial Server
 
 [startup]
 cmdline = %PYTHON% %FILE%
@@ -30,7 +30,7 @@ from serial import Serial
 from serial.tools import list_ports
 from serial.serialutil import SerialException
 
-from UCLA_CS_labrad.servers import CSPollingServer
+from UCLA_CS_labrad.servers import PollingServer
 
 
 SerialDevice = collections.namedtuple('SerialDevice', ['name', 'devicepath', 'HSS'])
@@ -38,12 +38,12 @@ PORTSIGNAL = 539410
 
 
 
-class CSSerialServer(CSPollingServer):
+class SerialServer(PollingServer):
     """
     Provides access to a computer's serial (COM) ports.
     """
 
-    name = '%LABRADNODE% CS Serial Server'
+    name = '%LABRADNODE% Serial Server'
     POLL_ON_STARTUP = True
     port_update = Signal(PORTSIGNAL, 'signal: port update', '(s,*s)')
 
@@ -207,8 +207,8 @@ class CSSerialServer(CSPollingServer):
         self.HSS=None
         self.sim_dev_list=[]
         servers=yield self.client.manager.servers()
-        if 'CS Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
-            self.HSS=self.client.servers['CS Hardware Simulating Server']
+        if 'Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
+            self.HSS=self.client.servers['Hardware Simulating Server']
             yield self.HSS.signal__device_added(8675309)
             yield self.HSS.signal__device_removed(8675310)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
@@ -671,9 +671,9 @@ class CSSerialServer(CSPollingServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-        if name=='CS Hardware Simulating Server':
+        if name=='Hardware Simulating Server':
             yield self.client.refresh()
-            self.HSS=self.client.servers['CS Hardware Simulating Server']
+            self.HSS=self.client.servers['Hardware Simulating Server']
             yield self.HSS.signal__device_added(8675309)
             yield self.HSS.signal__device_removed(8675310)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
@@ -682,7 +682,7 @@ class CSSerialServer(CSPollingServer):
     # SIGNALS
     @inlineCallbacks
     def serverDisconnected(self, ID, name):
-        if name=='CS Hardware Simulating Server':
+        if name=='Hardware Simulating Server':
             self.sim_dev_list=[]
             yield self.HSS.removeListener(listener=self.simDeviceAdded,source = None,ID=8675309)
             yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
@@ -722,7 +722,7 @@ class CSSerialServer(CSPollingServer):
    
    
    
-__server__ = CSSerialServer()
+__server__ = SerialServer()
 
 if __name__ == '__main__':
     from labrad import util

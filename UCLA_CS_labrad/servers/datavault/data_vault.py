@@ -16,7 +16,7 @@
 """
 ### BEGIN NODE INFO
 [info]
-name = CS Data Vault
+name = Data Vault
 version = 3.0.2
 description = Store and retrieve numeric data
 
@@ -39,7 +39,7 @@ import labrad.util
 import labrad.wrappers
 
 from data_vault import SessionStore
-from data_vault.server import CSDataVault
+from data_vault.server import DataVault
 # todo: add support for comments
 
 
@@ -56,7 +56,7 @@ def load_settings(cxn, name):
     nodename = labrad.util.getNodeName()
 
     # get startup values from registry
-    path = ['', 'Servers', name, 'CS Repository']
+    path = ['', 'Servers', name, 'Repository']
     reg = cxn.registry
     yield reg.cd(path, True)
     (dirs, keys) = yield reg.dir()
@@ -100,7 +100,7 @@ def main(argv=sys.argv):
     @inlineCallbacks
     def start():
         # create connection to labrad
-        opts = labrad.util.parseServerOptions(name=CSDataVault.name)
+        opts = labrad.util.parseServerOptions(name=DataVault.name)
         cxn = yield labrad.wrappers.connectAsync(
             host=opts['host'], port=int(opts['port']), password=opts['password']
         )
@@ -109,7 +109,7 @@ def main(argv=sys.argv):
 
         # create SessionStore
         session_store = SessionStore(datadir, hub=None)
-        server = CSDataVault(session_store)
+        server = DataVault(session_store)
         session_store.hub = server
 
         # Run the server. We do not need to start the reactor, but we will

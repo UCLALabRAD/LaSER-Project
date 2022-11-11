@@ -14,11 +14,11 @@ from os import remove
 # todo: make simple if statements oneliners
 
 
-class CSDataVault(LabradServer):
+class DataVault(LabradServer):
     """
     Stores and manages data/datasets using the HDF5 format.
     """
-    name = 'CS Data Vault'
+    name = 'Data Vault'
 
 
     # SETUP
@@ -682,7 +682,7 @@ class CSDataVault(LabradServer):
         return sess.getTags(dirs, datasets)
 
 
-class CSDataVaultMultiHead(CSDataVault):
+class DataVaultMultiHead(DataVault):
     """
     Data Vault server with additional settings for running multi-headed.
 
@@ -691,7 +691,7 @@ class CSDataVaultMultiHead(CSDataVault):
     """
 
     def __init__(self, host, port, password, hub, session_store):
-        CSDataVault.__init__(self, session_store)
+        DataVault.__init__(self, session_store)
         self.host = host
         self.port = port
         self.password = password
@@ -699,7 +699,7 @@ class CSDataVaultMultiHead(CSDataVault):
         self.alive = False
 
     def initServer(self):
-        CSDataVault.initServer(self)
+        DataVault.initServer(self)
         # let the DataVaultHost know that we connected
         self.hub.connect(self)
         self.alive = True

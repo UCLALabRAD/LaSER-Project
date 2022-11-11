@@ -1,10 +1,10 @@
 """
 ### BEGIN NODE INFO
 [info]
-name = CS Parameter Vault
+name = Parameter Vault
 version = 2.0
 description =
-instancename = CS Parameter Vault
+instancename = Parameter Vault
 
 [startup]
 cmdline = %PYTHON% %FILE%
@@ -19,12 +19,12 @@ from labrad.server import LabradServer, setting, Signal
 from twisted.internet.defer import inlineCallbacks
 
 
-class CSParameterVault(LabradServer):
+class ParameterVault(LabradServer):
     """
     Data Server for storing ongoing experimental parameters
     """
-    name = "CS Parameter Vault"
-    registryDirectory = ['', 'Servers', 'CS Parameter Vault']
+    name = "Parameter Vault"
+    registryDirectory = ['', 'Servers', 'Parameter Vault']
     onParameterChange = Signal(612512, 'signal: parameter change', '(ss)')
 
     @inlineCallbacks
@@ -220,4 +220,4 @@ class CSParameterVault(LabradServer):
 
 if __name__ == "__main__":
     from labrad import util
-    util.runServer(CSParameterVault())
+    util.runServer(ParameterVault())

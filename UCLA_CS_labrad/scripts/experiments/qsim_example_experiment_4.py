@@ -139,7 +139,7 @@ class LaserExperiment4(QsimExperiment):
 if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()                                  # creates LabRAD connection
-    scanner = cxn.cs_script_scanner                             # connects to script scanner server
+    scanner = cxn.script_scanner                             # connects to script scanner server
     exprt = LaserExperiment4(cxn=cxn)                     # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)    # registers an experiment with Script Scanner
     exprt.execute(ident)                                    # executes the experiment

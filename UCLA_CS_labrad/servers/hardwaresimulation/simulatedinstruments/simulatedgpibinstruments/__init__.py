@@ -1,0 +1,10 @@
+__all__=[]
+
+from UCLA_CS_labrad.servers.hardwaresimulation.simulatedinstruments.simulatedgpibinstruments.simulated_function_generator_instrument import *
+
+__all__.extend(simulated_function_generator_instrument.__all__)
+
+from UCLA_CS_labrad.servers.hardwaresimulation.simulatedinstruments.simulatedgpibinstruments.simulated_oscilloscope_instrument import *
+
+
+__all__.extend(simulated_oscilloscope_instrument.__all__)

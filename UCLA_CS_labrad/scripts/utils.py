@@ -18,7 +18,7 @@ def runExperiment(experiment, **kwargs):
     cxn = labrad.connect()
     # get script scanner and submit exp
     try:
-        ss = cxn.cs_script_scanner
+        ss = cxn.script_scanner
         exp = experiment(cxn=cxn)
         ident = ss.register_external_launch(exp.name)
         exp.execute(ident)

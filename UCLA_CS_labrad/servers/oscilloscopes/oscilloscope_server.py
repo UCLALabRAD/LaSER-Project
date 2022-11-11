@@ -26,7 +26,7 @@ from KeysightDS1204G import KeysightDS1204GWrapper
 from KeysightDSOX2024A import KeysightDSOX2024AWrapper
 
 
-class CSOscilloscopeServer(GPIBManagedServer):
+class OscilloscopeServer(GPIBManagedServer):
     """
     Manages communication with all oscilloscopes.
     """
@@ -323,5 +323,5 @@ class CSOscilloscopeServer(GPIBManagedServer):
 
 if __name__ == '__main__':
     from labrad import util
-    util.runServer(CSOscilloscopeServer())
+    util.runServer(OscilloscopeServer())
 

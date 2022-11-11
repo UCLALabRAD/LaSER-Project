@@ -27,7 +27,7 @@ class QsimExperiment(experiment.experiment):
     def _connect(self):
         super()._connect()
         try:
-            self.dv = self.cxn.servers['CS Data Vault']
+            self.dv = self.cxn.servers['Data Vault']
         except KeyError as error:
             error_message = error + '\n' + "DataVault is not running"
             raise KeyError(error_message)

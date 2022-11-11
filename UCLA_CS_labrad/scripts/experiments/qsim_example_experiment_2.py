@@ -27,8 +27,8 @@ class experiment_example(QsimExperiment):
     # variable named self.p.parameter_folder.parameter
 
     exp_parameters = []
-    exp_parameters.append(('cs_example_parameters', 'Range'))  # The format is (parameter folder, parameter)
-    exp_parameters.append(('cs_example_parameters', 'Amplitude'))
+    exp_parameters.append(('example_parameters', 'Range'))  # The format is (parameter folder, parameter)
+    exp_parameters.append(('example_parameters', 'Amplitude'))
 
     def initialize(self, cxn, context, ident):
 
@@ -40,7 +40,7 @@ class experiment_example(QsimExperiment):
         '''
 
         self.ident = ident  # this is required so that script scanner can sort and access different instances
-        self.pzt_server = cxn.cs_piezo_server
+        self.pzt_server = cxn.piezo_server
         self.pzt_channel = 1
 
     def run(self, cxn, context):
@@ -52,10 +52,10 @@ class experiment_example(QsimExperiment):
         '''
         self.setup_datavault('Range', 'Amplitude')  # gives the x and y names to Data Vault
         #self.setup_grapher('experiment_example')  # Tells the grapher which tab to plot the data on
-        self.amplitude = self.p.cs_example_parameters.Amplitude  # shortens the amplitude name
+        self.amplitude = self.p.example_parameters.Amplitude  # shortens the amplitude name
         # the following generates a list of the points used in the scan. If the points
         # have LabRAD unit types they can be specified in the second argument
-        self.x_values = self.get_scan_list(self.p.cs_example_parameters.Range, units=None)
+        self.x_values = self.get_scan_list(self.p.example_parameters.Range, units=None)
 
         self.pzt_voltage = self.pzt_server.voltage(self.pzt_channel)
 
@@ -88,7 +88,7 @@ class experiment_example(QsimExperiment):
 if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()  # creates LabRAD connection
-    scanner = cxn.csscriptscanner  # connects to script scanner server
+    scanner = cxn.scriptscanner  # connects to script scanner server
     exprt = experiment_example(cxn=cxn)  # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)  # executes the experiment

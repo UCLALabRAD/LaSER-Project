@@ -5,6 +5,7 @@ from labrad.units import WithUnit
 from labrad.types import Value
 from labrad.gpib import GPIBDeviceWrapper
 
+from UCLA_CS_labrad.servers.hardwaresimulation import SimulatedOscilloscopeInstrument
 
 class KeysightDSOX2024AWrapper(GPIBDeviceWrapper):
     def __init__(self,guid,name):
@@ -284,4 +285,52 @@ class KeysightDSOX2024AWrapper(GPIBDeviceWrapper):
         # use this return if return format is in bytes, otherwise need to adjust
         return np.frombuffer(data[2 + tmc_N:], dtype=np.uint8)
         
+        
+class SimulatedKeysightDSOX2024A(SimulatedOscilloscopeInstrument):
+    name= 'KeysightDSOX2024A'
+    version = '1.0'
+    description='Oscilloscope'
+    id_string='AGILENT TECHNOLOGIES,DSO-X 2024A,MY58104761,02.43.2018020635'
+    max_window_horizontal_scale=2.5
+    max_channel_scale=5
+    points_in_record_count=100000
+    command_dict={
+        (b':MEASure:VAV?',1) : SimulatedOscilloscopeInstrument.measure_average,
+        (b':MEASure:FREQ?',1) : SimulatedOscilloscopeInstrument.measure_frequency,
+        (b':MEASure:VPP?',1) : SimulatedOscilloscopeInstrument.measure_peak_to_peak,
+        (b':AUT',0) : SimulatedOscilloscopeInstrument.autoscale,
+        (b':CHANnel1:DISPlay',1): (lambda self, val: SimulatedOscilloscopeInstrument.toggle_channel(self,'1',val)),
+        (b':CHANnel2:DISPlay',1): (lambda self, val: SimulatedOscilloscopeInstrument.toggle_channel(self,'2',val)),
+        (b':CHANnel3:DISPlay',1): (lambda self, val: SimulatedOscilloscopeInstrument.toggle_channel(self,'3',val)),
+        (b':CHANnel4:DISPlay',1): (lambda self, val: SimulatedOscilloscopeInstrument.toggle_channel(self,'4',val)),
+        (b':CHANnel1:DISPlay?',0): (lambda self : SimulatedOscilloscopeInstrument.toggle_channel(self,'1')),
+        (b':CHANnel2:DISPlay?',0): (lambda self : SimulatedOscilloscopeInstrument.toggle_channel(self,'2')),
+        (b':CHANnel3:DISPlay?',0): (lambda self : SimulatedOscilloscopeInstrument.toggle_channel(self,'3')),
+        (b':CHANnel4:DISPlay?',0): (lambda self : SimulatedOscilloscopeInstrument.toggle_channel(self,'4')),
+        (b':MEASure:CLEar',0): None,
+        
+        (b':CHANnel1:OFFSet',1): (lambda self,val : SimulatedOscilloscopeInstrument.channel_offset(self,'1',val)),
+        (b':CHANnel2:OFFSet',1): (lambda self,val : SimulatedOscilloscopeInstrument.channel_offset(self,'2',val)),
+        (b':CHANnel3:OFFSet',1): (lambda self,val : SimulatedOscilloscopeInstrument.channel_offset(self,'3',val)),
+        (b':CHANnel4:OFFSet',1): (lambda self,val : SimulatedOscilloscopeInstrument.channel_offset(self,'4',val)),
+        (b':CHANnel1:OFFSet?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_offset(self,'1')),
+        (b':CHANnel2:OFFSet?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_offset(self,'2')),
+        (b':CHANnel3:OFFSet?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_offset(self,'3')),
+        (b':CHANnel4:OFFSet?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_offset(self,'4')),
+        
+        (b':CHANnel1:SCALe',1): (lambda self,val : SimulatedOscilloscopeInstrument.channel_scale(self,'1',val)),
+        (b':CHANnel2:SCALe',1): (lambda self,val : SimulatedOscilloscopeInstrument.channel_scale(self,'2',val)),
+        (b':CHANnel3:SCALe',1): (lambda self,val : SimulatedOscilloscopeInstrument.channel_scale(self,'3',val)),
+        (b':CHANnel4:SCALe',1): (lambda self,val : SimulatedOscilloscopeInstrument.channel_scale(self,'4',val)),
+        (b':CHANnel1:SCALe?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_scale(self,'1')),
+        (b':CHANnel2:SCALe?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_scale(self,'2')),
+        (b':CHANnel3:SCALe?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_scale(self,'3')),
+        (b':CHANnel4:SCALe?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_scale(self,'4')),
+        (b':TIMe:SCALe',1): SimulatedOscilloscopeInstrument.horizontal_scale,
+        (b':TIMe:SCALe?',0): SimulatedOscilloscopeInstrument.horizontal_scale,
+        (b':TIMe:POSition',1): SimulatedOscilloscopeInstrument.horizontal_position,
+        (b':TIMe:POSition?',0): SimulatedOscilloscopeInstrument.horizontal_position
+
+        
+        }
         

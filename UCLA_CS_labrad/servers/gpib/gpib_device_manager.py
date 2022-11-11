@@ -22,11 +22,14 @@ message = 987654321
 timeout = 5
 ### END NODE INFO
 """
-from twisted.internet.reactor import callLater
-from twisted.internet.defer import DeferredList, DeferredLock
 
 from labrad.units import Value
 from labrad.server import LabradServer, setting, inlineCallbacks, returnValue
+
+from twisted.internet.reactor import callLater
+from twisted.internet.defer import DeferredList, DeferredLock
+
+
 
 UNKNOWN = '<unknown>'
 

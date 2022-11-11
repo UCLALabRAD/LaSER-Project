@@ -120,7 +120,7 @@ from labrad.errors import Error
 from labrad.server import LabradServer, setting
 
 
-__all__ = ["SerialDeviceError", "SerialConnectionError", "CSSerialDeviceServer"]
+__all__ = ["SerialDeviceError", "SerialConnectionError", "SerialDeviceServer"]
 
 
 # ERROR CLASSES
@@ -147,7 +147,7 @@ class SerialConnectionError(Exception):
 
 
 # DEVICE CLASS
-class CSSerialDeviceServer(LabradServer):
+class SerialDeviceServer(LabradServer):
     """
     Base class for serial device servers.
     
@@ -163,7 +163,7 @@ class CSSerialDeviceServer(LabradServer):
     """
 
     # node parameters
-    name = 'CSSerialDevice'
+    name = 'SerialDevice'
     reg_key = None
     default_port = None
     default_node = None

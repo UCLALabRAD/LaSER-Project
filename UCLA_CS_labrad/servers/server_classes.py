@@ -2,13 +2,13 @@ from twisted.internet.task import LoopingCall
 from labrad.server import LabradServer, setting
 
 
-__all__ = ["CSPollingServer"]
+__all__ = ["PollingServer"]
 
 
 """
 Polling Server
 """
-class CSPollingServer(LabradServer):
+class PollingServer(LabradServer):
     """
     Holds all the functionality needed to run polling loops on the server.
     Also contains functionality for Signals.

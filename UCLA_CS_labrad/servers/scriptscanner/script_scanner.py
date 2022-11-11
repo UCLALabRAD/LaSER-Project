@@ -1,10 +1,10 @@
 '''
 ### BEGIN NODE INFO
 [info]
-name = CS Script Scanner
+name = Script Scanner
 version = 1.1
 description = Runs scripts
-instancename = CS Script Scanner
+instancename = Script Scanner
 
 [startup]
 cmdline = %PYTHON% %FILE%
@@ -49,7 +49,7 @@ class script_class_parameters(object):
         self.parameters = parameters
 
 
-class CSScriptScanner(LabradServer):
+class ScriptScanner(LabradServer):
     """
     Manages experiment scheduling.
     Attributes
@@ -59,7 +59,7 @@ class CSScriptScanner(LabradServer):
                         script_class_parameters instances.
     """
 
-    name = 'CS Script Scanner'
+    name = 'Script Scanner'
 
     # SIGNALS: RUNNING SCRIPTS
     on_running_new_script = Signal(200000, "signal_on_running_new_script", '(ws)')
@@ -384,4 +384,4 @@ class CSScriptScanner(LabradServer):
 
 if __name__ == "__main__":
     from labrad import util
-    util.runServer(CSScriptScanner())
+    util.runServer(ScriptScanner())
