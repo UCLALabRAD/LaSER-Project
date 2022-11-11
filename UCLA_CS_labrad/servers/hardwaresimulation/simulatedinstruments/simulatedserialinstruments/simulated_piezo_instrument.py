@@ -19,7 +19,7 @@ class SimulatedPiezoInstrument(SimulatedSerialInstrument):
     required_rts=None
     required_dtr=None
     
-    max_voltage=None
+    voltage_range=None
     
     set_voltage_string=None
     set_toggle_on_string=None
@@ -45,46 +45,35 @@ class SimulatedPiezoInstrument(SimulatedSerialInstrument):
     
 
     def get_channel_status(self,channel):
-        channel=int(channel)
-        if (1<= channel <= 4):
-            return (str(int(self.channels[channel-1].outputting)))
-        else:
-            #raise SimulatedPiezoError(5,[channel,"channel"])
-            raise SimulatedPiezoError(8,[channel,"channel"])
+        channel=self.enforce_type_and_range(channel,(int,(1,4)),"channel")
+        return (str(int(self.channels[channel-1].outputting)))
+
                     
                         
     def set_channel_status(self,channel,status):
-        channel=int(channel)
-        status=int(status)
-        
-        if (1<= channel <= 4):
-            if status==0:
-                self.channels[channel-1].outputting=False
-                return self.set_toggle_off_string.format(channel)
-            elif status==1:
-                self.channels[channel-1].outputting=True
-                return self.set_toggle_on_string.format(channel)
-            
-                    
+        channel=self.enforce_type_and_range(channel,(int,(1,4)),"channel")
+        status=self.enforce_type_and_range(status,(int,(0,1)),"status")
+        self.channels[channel-1].outputting=bool(status)
+        if status==0:
+            return self.set_toggle_off_string.format(channel)
+        elif status==1:
+            return self.set_toggle_on_string.format(channel)
                         
                         
 
     def get_channel_voltage(self,channel):
-        channel=int(channel)
-        current_voltage=None
-        if (1<= channel <= 4):
-            current_voltage=self.channels[channel-1].voltage
+        channel=self.enforce_type_and_range(channel,(int,(1,4)),"channel")
+        current_voltage=self.channels[channel-1].voltage
         return "{:.2f}".format(current_voltage)
                 
                 
     def set_channel_voltage(self,channel,voltage):
-        channel=int(channel)
-        voltage=float(voltage)
-        if voltage>self.max_voltage:
-            voltage=self.max_voltage
-        elif voltage<0:
-            voltage=0
-        if (1<= channel <= 4):
-            self.channels[channel-1].voltage=voltage
+        channel=self.enforce_type_and_range(channel,(int,(1,4)),"channel")
+        
+        voltage=self.enforce_type_and_range(voltage,(float,self.calculate_voltage_range()),"voltage")
+        self.channels[channel-1].voltage=voltage
 
         return self.set_voltage_string.format(channel,voltage)
+        
+    def calculate_voltage_range(self):
+        return self.voltage_range

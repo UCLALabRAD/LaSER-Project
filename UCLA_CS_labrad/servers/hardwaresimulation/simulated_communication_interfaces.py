@@ -4,6 +4,7 @@ from twisted.internet.threads import deferToThread
 
 from datetime import datetime as dt
 
+from UCLA_CS_labrad.servers.hardwaresimulation.simulatedinstruments.simulated_instruments import SimulatedGPIBInstrument, SimulatedSerialInstrument,SimulatedInstrumentError
 
 class SimulatedCommunicationInterface(object):
 
@@ -43,7 +44,7 @@ class SimulatedCommunicationInterface(object):
         
     @property
     def type(self):
-        if issubclass(dev.cls,GPIBDeviceModel):
+        if issubclass(type(self.dev),SimulatedGPIBInstrument):
             return "GPIB"
         else:
             return "Serial"
@@ -57,11 +58,11 @@ class SimulatedCommunicationInterface(object):
         self.max_buffer_size=val
         if len(self.input_buffer)>self.max_buffer_size:
            temp=self.input_buffer
-           self.input_buffer=bytearray(temp[:max_buffer_size])
+           self.input_buffer=bytearray(temp[:self.max_buffer_size])
         self.max_buffer_size=val
         if len(self.output_buffer)>self.max_buffer_size:
            temp=self.output_buffer
-           self.output_buffer=bytearray(temp[:max_buffer_size])
+           self.output_buffer=bytearray(temp[:self.max_buffer_size])
 
 
     def clear_buffers(self):
@@ -117,7 +118,7 @@ class SimulatedSerialCommunicationInterface(SimulatedCommunicationInterface):
                 else:
                     return bytearray(b'')
                 
-        raise SimulatedDeviceError(2)
+        raise SimulatedInstrumentError(2)
     
 
     def read(self,count=None):
@@ -134,8 +135,7 @@ class SimulatedSerialCommunicationInterface(SimulatedCommunicationInterface):
     @inlineCallbacks
     def write(self,data):
         if len(self.output_buffer)+len(data)>self.max_buffer_size:
-            self.output_buffer.extend(data[:(self.max_buffer_size-len(self.output_buffer))])
-            #buffer overflow error
+            raise SimulatedInstrumentError(6,[self.max_buffer_size])
         else:
             self.output_buffer.extend(data)
         yield self.process_commands()
@@ -149,32 +149,23 @@ class SimulatedSerialCommunicationInterface(SimulatedCommunicationInterface):
             command_interpretation=None
             try:
                 command_interpretation= yield deferToThread(lambda:self.interpret_serial_command(cmd))
-                #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
-                    #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
-                    #error
-            except SimulatedDeviceError as e:
+                
+            except SimulatedInstrumentError as e:
                 self.error_list.append((str(dt.now()),cmd.decode(),str(e)))
                 
             
             else:
                 if command_interpretation:
                     command_interpretation=command_interpretation+self.dev.output_termination_byte
+                    if len(self.input_buffer)+len(command_interpretation)>self.max_buffer_size:
+                        raise SimulatedInstrumentError(6,[self.max_buffer_size])
                 self.input_buffer.extend(command_interpretation)
-        
-
-        
- 
-        
-        
         
         
         
 class SimulatedGPIBCommunicationInterface(SimulatedCommunicationInterface):
     
-
     id_string=None
-    
-        
     
         
     def expand_chained_commands(self,cmd):
@@ -260,8 +251,12 @@ class SimulatedGPIBCommunicationInterface(SimulatedCommunicationInterface):
 
     def interpret_serial_command(self, cmd):
         #query vs setting vs default
+        if not cmd:
+            raise SimulatedInstrumentError(2)
         if cmd.decode()[0]=='*':
             if cmd==self.dev.id_command:
+                if not self.dev.id_string:
+                    raise SimulatedInstrumentError(7)
                 return self.dev.id_string
             elif cmd==self.dev.clear_command:
                 self.clear_buffers()
@@ -270,7 +265,7 @@ class SimulatedGPIBCommunicationInterface(SimulatedCommunicationInterface):
                 self.dev.set_default_settings()
                 return
             else:
-                pass
+                raise SimulatedInstrumentError(2)
                 
                 
         else:
@@ -297,12 +292,12 @@ class SimulatedGPIBCommunicationInterface(SimulatedCommunicationInterface):
                         if resp:
                             return resp.encode()
                         else:
-                            raise Exception()
+                            raise SimulatedInstrumentError(3)
                     
                     else:
                         self.dev.execute_command(func,[arg.decode() for arg in args_list])
                         return
-            raise Exception()
+            raise SimulatedInstrumentError(2)
             
         
         
@@ -324,8 +319,7 @@ class SimulatedGPIBCommunicationInterface(SimulatedCommunicationInterface):
             data=data[1:]
 
         if len(self.output_buffer)+len(data)>self.max_buffer_size:
-            self.output_buffer.extend(data[:(self.max_buffer_size-len(self.output_buffer))])
-            #buffer overflow error
+            raise SimulatedInstrumentError(6,[self.max_buffer_size])
         else:
             self.output_buffer.extend(data)
         yield self.process_commands()
@@ -343,14 +337,14 @@ class SimulatedGPIBCommunicationInterface(SimulatedCommunicationInterface):
             command_interpretation=None
             try:
                 command_interpretation= yield deferToThread(lambda:self.interpret_serial_command(cmd))
-                #if len(self.output_buffer)+len(command_interpretation)>self.max_buffer_size:
-                    #self.output_buffer.extend(command_interpretation.encode()[:(self.max_buffer_size-len(self.output_buffer))])
-                    #error
-            except SimulatedDeviceError as e:
+
+            except SimulatedInstrumentError as e:
                 self.error_list.append((str(dt.now()),cmd.decode(),str(e)))
             
             else:
                 if command_interpretation:
+                    if len(self.input_buffer)+len(command_interpretation)>self.max_buffer_size:
+                        raise SimulatedInstrumentError(6,[self.max_buffer_size])
                     self.input_buffer.extend(command_interpretation+self.dev.output_termination_byte)
                 
         

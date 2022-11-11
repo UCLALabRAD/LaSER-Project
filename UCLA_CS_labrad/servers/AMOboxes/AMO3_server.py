@@ -175,7 +175,7 @@ class SimulatedAMO3(SimulatedPiezoInstrument):
     
     required_baudrate=38400
     
-    max_voltage=150.0
+    voltage_range=(0,150.0)
     set_voltage_string="vout.w : set output {} to {:.3f}"
     set_toggle_on_string="out.w : output {} enabled"
     set_toggle_off_string="out.w : output {} disabled"

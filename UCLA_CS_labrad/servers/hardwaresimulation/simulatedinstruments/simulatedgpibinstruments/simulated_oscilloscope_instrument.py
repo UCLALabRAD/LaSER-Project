@@ -1,5 +1,5 @@
 from ..simulated_instruments import SimulatedGPIBInstrument, SimulatedInstrumentError
-from UCLA_CS_labrad.servers.hardwaresimulation import SimulatedInputSignal
+from UCLA_CS_labrad.servers.hardwaresimulation.cablesimulation.simulated_signals import SimulatedInputSignal
 
 
 from twisted.internet.threads import deferToThread
@@ -23,7 +23,6 @@ class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
     max_channel_scale=None
     points_in_record_count=None
     
-    
     def __init__(self):
         super().__init__()
         self.channels=[]
@@ -39,35 +38,44 @@ class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
         
     def horizontal_scale(self,val=None):
         if val:
-            self.window_horizontal_scale=float(val)
+            val=self.enforce_type_and_range(val,(float,(0,self.max_window_horizontal_scale)),"horizontal scale")
+            self.window_horizontal_scale=val
+
         else:
             return str(self.window_horizontal_scale)
         
 
     def horizontal_position(self,val=None):
         if val:
-            self.window_horizontal_position=float(val)
+            val=self.enforce_type_and_range(val,(float,(self.window_horizontal_scale*-5,self.max_window_horizontal_scale*5)),"horizontal position")
+            self.window_horizontal_position=val
         else:
             return str(self.window_horizontal_position)
         
     def channel_scale(self,chan, val=None):
-        chan=int(chan)
+        chan=self.enforce_type_and_range(chan,(int,(1,4)),"channel")
         if val:
-            self.channel_scales[chan-1]=float(val)
+            val=self.enforce_type_and_range(val,(float,(0,self.max_channel_scale)),"channel scale")
+            
+            self.channel_scales[chan-1]=val
+
         else:
             return str(self.channel_scales[chan-1])
         
+        
     def channel_offset(self,chan, val=None):
-        chan=int(chan)
+        chan=self.enforce_type_and_range(chan,(int,(1,4)),"channel")
         if val:
-            self.channel_positions[chan-1]=-1*float(val)
+            val=self.enforce_type_and_range(val,(float,(-4*self.max_channel_scale,4*self.max_channel_scale)),"channel position")
+            self.channel_positions[chan-1]=-1*val
         else:
             return str(-1*self.channel_positions[chan-1])
     
     def toggle_channel(self,chan, val=None):
-        chan=int(chan)
+        chan=self.enforce_type_and_range(chan,(int,(1,4)),"channel")
         if val:
-            self.channels[chan-1].is_on=bool(int(val))
+            val=self.enforce_type_and_range(val,(int,(0,1)),"channel display status")
+            self.channels[chan-1].is_on=bool(val)
         else:
             return str(int(self.channels[chan-1].is_on))
         

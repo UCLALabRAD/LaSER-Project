@@ -30,11 +30,12 @@ import UCLA_CS_labrad.config.hardwaresimulationserver_config as hss_config
 from UCLA_CS_labrad.servers.hardwaresimulation import SimulatedGPIBInstrument, SimulatedSerialInstrument
 from UCLA_CS_labrad.servers.hardwaresimulation.simulated_communication_interfaces import SimulatedGPIBCommunicationInterface,SimulatedSerialCommunicationInterface
 
+from UCLA_CS_labrad.servers.hardwaresimulation.cablesimulation.simulated_signals import CableError
 
 STATUS_TYPE = '*(s{name} s{desc} s{ver})'
 
 class HSSError(Exception):
-    errorDict ={ 0:'Device already exists at specified node and address',1:'No device exists at specified node and address',2: 'Device type not supaddressed.',3: 'No directories for Simulated Device files found in registry',4:'One or more simulated device info blocks were not successfully parsed in directory.', 5:'Unable to find class for desired device in module'}
+    errorDict ={0:'Device already exists at specified node and address',1:'No device exists at specified node and address',2: 'Device type not supported.',3:'No simulated device models were successfully imported.',4:'Device already selected.',5:'Tried to set serial connection parameter for GPIB device.',6:'Error connecting cable: one of the channels already has a cable plugged in.',7:'Error (dis)connecting cable: one of the channels does not exist',8:'Error disconnecting cable: input channel did not have a cable plugged in.'}
 
     def __init__(self, code):
         self.code = code
@@ -108,7 +109,7 @@ class HardwareSimulationServer(LabradServer):
     @setting(13, 'Simulated Read', count='i', returns='s')
     def simulated_read(self,c,count=None):
         if not c['Device']:
-            return None
+            raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
         try:
@@ -121,7 +122,7 @@ class HardwareSimulationServer(LabradServer):
     @setting(14, 'Simulated Write', data='s', returns='i')
     def simulated_write(self,c,data):
         if not c['Device']:
-            return None
+            raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
         try:
@@ -165,6 +166,7 @@ class HardwareSimulationServer(LabradServer):
     def get_in_waiting(self,c):
         if not c['Device']:
             raise HSSError(1)
+        active_device=c['Device']
         yield active_device.lock.acquire()
         try:
             buf_len=len(active_device.input_buffer)
@@ -210,19 +212,25 @@ class HardwareSimulationServer(LabradServer):
         
     @setting(61, 'Select Device', node='s', address='i', returns='')
     def select_device(self,c,node,address):
+        if c['Device']:
+            raise HSSError(4)
         c['Device']=self.devices[(node,address)]
     
       
     @setting(62, 'Deselect Device',returns='')
-    def deselect_device(self,c):    
+    def deselect_device(self,c):
         c['Device']=None
 
 
     @setting(71, 'Baudrate', val=[': Query current baudrate', 'w: Set baudrate'], returns='w: Selected baudrate')
     def baudrate(self,c,val):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
         try:
+            if active_device.type=="GPIB":
+                raise HSSError(5)
             if val:
                 active_device.comm_baudrate=val
             resp=active_device.comm_baudrate
@@ -232,9 +240,13 @@ class HardwareSimulationServer(LabradServer):
         
     @setting(72, 'Bytesize',val=[': Query current stopbits', 'w: Set bytesize'], returns='w: Selected bytesize')
     def bytesize(self,c,val):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
         try:
+            if active_device.type=="GPIB":
+                raise HSSError(5)
             if val:
                 active_device.comm_bytesize=val
             resp=active_device.comm_bytesize
@@ -244,9 +256,13 @@ class HardwareSimulationServer(LabradServer):
         
     @setting(73, 'Parity', val=[': Query current parity', 'w: Set parity'], returns='w: Selected parity')
     def parity(self,c,val):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
         try:
+            if active_device.type=="GPIB":
+                raise HSSError(5)
             if val:
                 active_device.comm_parity=val
             resp=active_device.comm_parity
@@ -256,9 +272,13 @@ class HardwareSimulationServer(LabradServer):
         
     @setting(74, 'Stopbits', val=[': Query current stopbits', 'w: Set stopbits'], returns='w: Selected stopbits')
     def stopbits(self,c,val):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
         try:
+            if active_device.type=="GPIB":
+                raise HSSError(5)
             if val:
                 active_device.comm_stopbits=val
             resp=active_device.comm_stopbits
@@ -268,9 +288,13 @@ class HardwareSimulationServer(LabradServer):
         
     @setting(75, 'RTS', val='b', returns='b')
     def rts(self,c,val):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
         try:
+            if active_device.type=="GPIB":
+                raise HSSError(5)
             if val:
                 active_device.comm_rts=val
             resp=active_device.comm_rts
@@ -280,9 +304,13 @@ class HardwareSimulationServer(LabradServer):
         
     @setting(76, 'DTR', val='b', returns='b')
     def dtr(self,c,val):
+        if not c['Device']:
+            raise HSSError(1)
         active_device=c['Device']
         yield active_device.lock.acquire()
         try:
+            if active_device.type=="GPIB":
+                raise HSSError(5)
             if val:
                 active_device.comm_dtr=val
             resp=active_device.comm_dtr
@@ -297,18 +325,18 @@ class HardwareSimulationServer(LabradServer):
         active_device=c['Device']
         yield active_device.lock.acquire()
         try:
-             if size:
-                 active_device.buffer_size=size
-             resp=active_device.buffer_size
+            if size:
+                active_device.buffer_size=size
+            resp=active_device.buffer_size
              
         finally:
-             active_device.buffer_size.release()
+             active_device.lock.release()
         returnValue(resp)
         
       
     @setting(92, 'Get Available Device Types',returns='*(ssb)')
     def get_available_device_types(self, c):
-        return [(model.name +' v'+model.version, model.description, (issubclass(model.cls,GPIBDeviceModel))) for model in self.sim_instr_models.values()]
+        return [(model.name +' v'+model.version, model.description, (issubclass(model.cls,SimulatedGPIBInstrument))) for model in self.sim_instr_models.values()]
 
     @setting(100, "Reload Available Device Types")
     def reload_available_scripts(self, c):
@@ -333,6 +361,10 @@ class HardwareSimulationServer(LabradServer):
                 out_conn=out_dev.channels[out_channel-1]
                 in_conn=in_dev.channels[in_channel-1]
                 in_conn.plug_in(out_conn)
+            except CableError as e:
+                raise HSSError(6)
+            except (IndexError,AttributeError) as e:
+                raise HSSError(7)
             finally:
                 in_dev.lock.release()
                 out_dev.lock.release()
@@ -349,11 +381,13 @@ class HardwareSimulationServer(LabradServer):
             out_dev.lock.release()
         else:
             try:
-                #out_dev_lock=out_dev.lock.acquire()
-                #in_dev_lock=in_dev.lock.acquire()
-                #yield DeferredList([out_dev_lock,in_dev_lock])
+                out_conn=out_dev.channels[out_channel-1]
                 in_conn=in_dev.channels[in_channel-1]
                 in_conn.unplug()
+            except (IndexError,AttributeError) as e:
+                raise HSSError(7)
+            except CableError as e:
+                raise HSSError(8)
             finally:
                 in_dev.lock.release()
                 out_dev.lock.release()

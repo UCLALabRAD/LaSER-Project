@@ -3,7 +3,7 @@ class SimulatedInstrumentError(Exception):
 
     user_defined_errors={}
     
-    base_error_dict={1: 'Trying to communicate with device with {} of {}; expected {}.',2: 'Command not recognized', 3: 'GPIB Query returned empty string.',4: 'Type of parameter {} is {} but should be {}', 5:'Value of {} for {} out of range'}
+    base_error_dict={1: 'Trying to communicate with device with {} of {}; expected {}.',2: 'Command not recognized', 3: 'GPIB Query returned empty string.',4: 'Type of parameter {} should be {}', 5:'Value of {} for {} out of range',6: 'Buffer of size {} overflowed.',7:'No identifying string specified.'}
     def __init__(self, code,parameters=[]):
         self.code = code
         self.errorDict =dict(self.base_error_dict)
@@ -36,6 +36,29 @@ class SimulatedInstrument(object):
     
     def execute_command(self,func,args):
         return func(self,*args)
+    
+    def enforce_type_and_range(self,val,options,param):
+        if type(options)=tuple:
+            options=[options]
+        correct_type=False
+        for val_type,val_range in options:
+            try:
+                val_type(val)
+                correct_type=True
+            except:
+                continue
+            if type(val_range)==tuple:
+                val_low,val_high=val_range
+                if not (val_low <= val <= val_high):
+                    continue
+            else:
+                if not (val in val_range):
+                    continue
+            return val_type(val)
+        if not correct_type:
+            raise SimulatedInstrumentError(4,[param,options[0]])
+        raise SimulatedInstrumentError(5,[val, param])
+        
     
 class SimulatedSerialInstrument(SimulatedInstrument):
 

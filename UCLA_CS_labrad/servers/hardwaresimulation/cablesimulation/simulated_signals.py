@@ -5,6 +5,9 @@ import threading
 
 __all__=["SimulatedOutputSignal","SimulatedInputSignal"]
 
+class CableError(Exception):
+    def __init__(self):
+        super().__init__()
 class SimulatedOutputSignal(object):
     
     def __init__(self):
@@ -47,6 +50,8 @@ class SimulatedInputSignal(object):
         self.points_in_memory=points_in_memory
 
     def plug_in(self,outSignal):
+        if self.input_signal_log or outSignal.output_signal_log.record_time_length:
+            raise CableError()
         self.input_signal_log=outSignal.output_signal_log
         self.input_signal_log.record_time_length=self.record_time_length
         outSignal.update_signal_function()
@@ -56,6 +61,8 @@ class SimulatedInputSignal(object):
         
         
     def unplug(self):
+        if not self.input_signal_log:
+            raise CableError()
         self.input_signal_log.record_time_length=None
         self.input_signal_log.erase_log()
         self.input_signal_log=None

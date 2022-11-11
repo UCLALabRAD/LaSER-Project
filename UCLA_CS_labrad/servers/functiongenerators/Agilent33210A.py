@@ -1,6 +1,7 @@
 from labrad.gpib import GPIBDeviceWrapper
 from twisted.internet.defer import inlineCallbacks, returnValue
-
+from scipy import signal
+import numpy as np
 from UCLA_CS_labrad.servers.hardwaresimulation import SimulatedFunctionGeneratorInstrument
 
 class Agilent33210AWrapper(GPIBDeviceWrapper):
@@ -82,6 +83,12 @@ class SimulatedAgilent33210A(SimulatedFunctionGeneratorInstrument):
     name= 'Agilent33210A'
     version = '1.0'
     description='test function generator'
+    function_map={"SIN":np.sin,"SQU":signal.square,"RAMP":signal.sawtooth}#duty supported for square, symmetry supported for ramp
+    freq_ranges={"SIN":(.001,10000000),"SQU":(.001,10000000),"RAMP":(.001,100000000)}
+    max_voltage=5.0
+    def_amp=.1
+    def_freq=1000.0
+    def_func="SIN"
     
     id_string='Agilent Technologies,33210A,MY48007979,1.04-1.04-22-2'
     command_dict={
@@ -97,5 +104,7 @@ class SimulatedAgilent33210A(SimulatedFunctionGeneratorInstrument):
         (b'FUNCtion?',0)        : SimulatedFunctionGeneratorInstrument.function,
         (b'VOLTage:OFFSet?',0)        : SimulatedFunctionGeneratorInstrument.offset
     }
+    freq_range=
+    
     
             

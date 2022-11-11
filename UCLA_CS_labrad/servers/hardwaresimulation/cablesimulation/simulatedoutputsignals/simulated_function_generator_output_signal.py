@@ -1,5 +1,5 @@
 from ..simulated_signals import SimulatedOutputSignal
-    
+import numpy as np
 __all__=["SimulatedFunctionGeneratorOutputSignal"]
 class SimulatedFunctionGeneratorOutputSignal(SimulatedOutputSignal):
     def __init__(self):
@@ -10,23 +10,8 @@ class SimulatedFunctionGeneratorOutputSignal(SimulatedOutputSignal):
         self.current_offset=0.0
         
         
-    def generate_periodic_signal_func(self,function,frequency,amplitude,offset):
-        scipy_func=None
-        if function=="SIN":
-            scipy_func=np.sin
-        elif function=="SQU":
-            scipy_func=signal.square #duty supported
-        elif function=="RAMP":
-            scipy_func=signal.sawtooth #symmetry supported
-        elif function=="PULS":
-            pass
-        elif function=="NOIS":
-            pass
-        elif function=="DC":
-            pass
-        else:
-            pass
-        return (lambda arr: (scipy_func((2*np.pi*frequency*arr)-offset))*amplitude)
+    def generate_periodic_signal_func(self,func,frequency,amplitude,offset):
+        return (lambda arr: (func((2*np.pi*frequency*arr)-offset))*amplitude)
         
     def calculate_signal_function(self):
         return self.generate_periodic_signal_func(self.function,self.frequency,self.amplitude,self.offset)
