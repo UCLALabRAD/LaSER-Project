@@ -36,6 +36,11 @@ from UCLA_CS_labrad.servers import PollingServer
 SerialDevice = collections.namedtuple('SerialDevice', ['name', 'devicepath', 'HSS'])
 PORTSIGNAL = 539410
 
+class NoPortSelectedError(Error):
+    """
+    Please open a port first.
+    """
+    code = 1
 
 
 class SerialServer(PollingServer):
@@ -64,8 +69,9 @@ class SerialServer(PollingServer):
             self.ser=hss
             self.input_buffer=bytearray(b'')
             self.error_list=[]
-            
-            self.open= lambda: self.ser.select_device(node, int(self.name[-1]), context=self.ctxt)
+            self.node=node
+            self.is_broken=False
+            self.is_closed=False
             self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
             
             self.get_error_list=lambda: self.ser.get_device_error_list(context=self.ctxt)
@@ -74,26 +80,34 @@ class SerialServer(PollingServer):
             
                 
             self.buff_lock=DeferredLock()
-            self.err_list_lock=DeferredLock()
-            self.active_device_connections.append(self.name)
-            if self.ser:
-                self.open()
+            
+
+            self.open()
                 
 
           
         def reset_input_buffer(self):
             self.input_buffer=bytearray()
-            
-        @inlineCallbacks
+        
+        def open(self):
+            self.active_device_connections.append(self.name)
+            if not self.is_broken and self.ser:
+                self.ser.select_device(self.node, int(self.name[-1]), context=self.ctxt)
+                self.is_closed=False
+                
+                
+
         def break_connection(self):
+            self.is_broken=True
+            self.close()
+ 
+
+        def close(self):
             if self.name in self.active_device_connections:
                 self.active_device_connections.remove(self.name)
             if self.ser:
-                yield self.ser.deselect_device(context=self.ctxt)
- 
-        @inlineCallbacks
-        def close(self):
-            yield self.break_connection()
+                self.ser.deselect_device(context=self.ctxt)
+            self.is_closed=True
          
         @property
         def in_waiting(self):
@@ -105,6 +119,8 @@ class SerialServer(PollingServer):
             
 
         def read(self,byte_count):
+            if self.is_closed:
+                raise Error()
             if not self.buff_lock.locked:
                 self.buff_lock.acquire()
                 resp,rest=self.input_buffer[:byte_count],self.input_buffer[byte_count:]
@@ -116,6 +132,8 @@ class SerialServer(PollingServer):
         
         
         def write(self,data):
+            if self.is_closed:
+                raise Error()
             self.ser.simulated_write(data,context=self.ctxt)
             d=self.ser.simulated_read(context=self.ctxt)
             d.addCallback(lambda x: x.encode())
@@ -173,7 +191,7 @@ class SerialServer(PollingServer):
                 
         @stopbits.setter
         def stopbits(self, val):
-            return self.ser.stopbits(val,context=self.ctxt)
+            self.ser.stopbits(val,context=self.ctxt)
              
         @property
         def dtr(self):
@@ -207,8 +225,8 @@ class SerialServer(PollingServer):
         self.HSS=None
         self.sim_dev_list=[]
         servers=yield self.client.manager.servers()
-        if 'Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
-            self.HSS=self.client.servers['Hardware Simulating Server']
+        if 'Hardware Simulation Server' in [HSS_name for _,HSS_name in servers]:
+            self.HSS=self.client.servers['Hardware Simulation Server']
             yield self.HSS.signal__device_added(8675309)
             yield self.HSS.signal__device_removed(8675310)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
@@ -266,7 +284,7 @@ class SerialServer(PollingServer):
             
     def getPort(self,c):
         if not c['PortObject']:
-            raise Error()
+            raise NoPortSelectedError()
         return c['PortObject']
             
 #Get Information About Ports
@@ -521,8 +539,8 @@ class SerialServer(PollingServer):
             if r == b'':
                 r = yield self.deferredRead(ser, timeout, count - len(recd))
                 if r == b'':
-                    yield ser.close()
-                    yield ser.open()
+                    ser.close()
+                    ser.open()
                     break
             recd += r
         returnValue(recd)
@@ -660,6 +678,12 @@ class SerialServer(PollingServer):
         ser = self.getPort(c)
         resp=yield ser.get_error_list()
         returnValue(resp)
+    
+    @setting(81, 'Test restart', returns='')
+    def test_restart(self,c):
+        ser = self.getPort(c)
+        ser.close()
+        ser.open()
         
         
 
@@ -671,9 +695,9 @@ class SerialServer(PollingServer):
         """
         # check if we aren't connected to a device, port and node are fully specified,
         # and connected server is the required serial bus server
-        if name=='Hardware Simulating Server':
+        if name=='Hardware Simulation Server':
             yield self.client.refresh()
-            self.HSS=self.client.servers['Hardware Simulating Server']
+            self.HSS=self.client.servers['Hardware Simulation Server']
             yield self.HSS.signal__device_added(8675309)
             yield self.HSS.signal__device_removed(8675310)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
@@ -682,7 +706,7 @@ class SerialServer(PollingServer):
     # SIGNALS
     @inlineCallbacks
     def serverDisconnected(self, ID, name):
-        if name=='Hardware Simulating Server':
+        if name=='Hardware Simulation Server':
             self.sim_dev_list=[]
             yield self.HSS.removeListener(listener=self.simDeviceAdded,source = None,ID=8675309)
             yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
@@ -692,6 +716,7 @@ class SerialServer(PollingServer):
                 if not port_obj:
                     continue
                 elif isinstance(port_obj,self.DeviceConnection):
+                    port_obj.ser=None
                     port_obj.break_connection()
         
     
@@ -710,6 +735,7 @@ class SerialServer(PollingServer):
         node, port=data
         if node==self.name:
             self.sim_dev_list.remove("SIMCOM"+str(port))
+            print(self.sim_dev_list)
             for ctxt_dict in [ctxt.data for ctxt in self.contexts.values()]:
                 port_obj=ctxt_dict['PortObject']
                 if not port_obj:
@@ -718,7 +744,7 @@ class SerialServer(PollingServer):
                     port_obj.break_connection()
                     break
                     
-        
+    
    
    
    

@@ -425,7 +425,6 @@ class HardwareSimulationServer(LabradServer):
         for node, address in self.devices.keys():
             if name==node:
                self.device_added((node,address))
-               break
                     
         
 

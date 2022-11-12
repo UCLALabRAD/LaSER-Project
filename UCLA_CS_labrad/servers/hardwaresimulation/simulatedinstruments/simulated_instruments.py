@@ -38,7 +38,7 @@ class SimulatedInstrument(object):
         return func(self,*args)
     
     def enforce_type_and_range(self,val,options,param):
-        if type(options)=tuple:
+        if type(options)==tuple:
             options=[options]
         correct_type=False
         for val_type,val_range in options:

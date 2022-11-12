@@ -247,10 +247,25 @@ class SerialDeviceServer(LabradServer):
          #open connection on startup if default node and port are specified
 
         if self.default_node and self.default_port:
+        
             print('Default node and port specified. Connecting to device on startup.')
-            
-            serStr = yield self.findSerial(self.default_node)
-            yield self.initSerial(serStr, self.default_port, timeout=self.timeout, baudrate=self.baudrate, bytesize=self.bytesize, parity=self.parity,stopbits=self.stopbits)
+            try:
+                serStr = yield self.findSerial(self.default_node)
+                yield self.initSerial(serStr, self.default_port, timeout=self.timeout, baudrate=self.baudrate, bytesize=self.bytesize, parity=self.parity,stopbits=self.stopbits)
+            except SerialConnectionError as e:
+                if (self.default_node,self.default_port) in self.serial_connection_dict:
+                    del self.serial_connection_dict[(self.default_node,self.default_port)]
+                if e.code == 0:
+                    print('Could not find serial server for node: %s' % self.serNode)
+                    print('Please start correct serial server')
+                elif e.code == 1:
+                    print('Error opening serial connection')
+                else:
+                    raise Exception('Unknown connection error')
+            except Error:
+                # maybe check for serialutil.SerialException?
+                print('Unknown connection error')
+                raise
     @inlineCallbacks
     def stopServer(self):
         """
@@ -324,16 +339,19 @@ class SerialDeviceServer(LabradServer):
         print('\ttimeout:\t%s\n\n' % (str(kwargs.get('timeout')) if kwargs.get('timeout') is not None else 'No timeout'))
         # find relevant serial server
         cli = self.client
-   
-        # get server wrapper for serial server
-        ser = cli.servers[serStr]
-        # instantiate SerialConnection convenience class
-        self.serial_connection_dict[(serStr,port)]=self.SerialConnection(ser, self.client.context(), port, **kwargs)
-        # clear input and output buffers
-        yield self.serial_connection_dict[(serStr,port)].flush_input()
-        yield self.serial_connection_dict[(serStr,port)].flush_output()
-        print('Serial connection opened.')
-
+        try:
+            # get server wrapper for serial server
+            ser = cli.servers[serStr]
+            # instantiate SerialConnection convenience class
+            self.serial_connection_dict[(serStr,port)]=self.SerialConnection(ser, self.client.context(), port, **kwargs)
+            # clear input and output buffers
+            yield self.serial_connection_dict[(serStr,port)].flush_input()
+            yield self.serial_connection_dict[(serStr,port)].flush_output()
+            print('Serial connection opened.')
+        except Error:
+            if (serStr,port) in self.serial_connection_dict:
+                del self.serial_connection_dict[(serStr,port)]
+            raise SerialConnectionError(1)
 
     @inlineCallbacks
     def findSerial(self, serNode=None):
@@ -352,7 +370,7 @@ class SerialDeviceServer(LabradServer):
         try:
             returnValue([i[1] for i in servers if self._matchSerial(serNode, i[1])][0])
         except IndexError:
-            pass
+            raise SerialConnectionError(0)
 
     @staticmethod
     def _matchSerial(serNode, potMatch):
@@ -428,10 +446,24 @@ class SerialDeviceServer(LabradServer):
         # raise error if only node or port is specified
         else:
             raise Exception('Insufficient arguments.')
-        
-        desired_node=yield self.findSerial(desired_node)
-        if (desired_node,desired_port) not in self.serial_connection_dict:
-            yield self.initSerial(desired_node, desired_port, timeout=self.timeout, baudrate=self.baudrate,  bytesize=self.bytesize, parity=self.parity, stopbits=self.stopbits)
+        try:
+            desired_node=yield self.findSerial(desired_node)
+            if (desired_node,desired_port) not in self.serial_connection_dict:
+                yield self.initSerial(desired_node, desired_port, timeout=self.timeout, baudrate=self.baudrate,  bytesize=self.bytesize, parity=self.parity, stopbits=self.stopbits)
+        except SerialConnectionError as e:
+            if (desired_node,desired_port) in self.serial_connection_dict:
+                del self.serial_connection_dict[(desired_node,desired_port)]
+            if e.code == 0:
+                print('Could not find serial server for node: %s' % desired_node)
+                print('Please start correct serial server')
+            elif e.code == 1:
+                print('Error opening serial connection')
+            else:
+                print('Unknown connection error')
+            raise e
+        except Exception as e:
+            self.ser = None
+            print(e)
         c['Serial Connection']=self.serial_connection_dict[(desired_node,desired_port)]
         c['Serial Node']=desired_node
         c['Serial Port']=desired_port
