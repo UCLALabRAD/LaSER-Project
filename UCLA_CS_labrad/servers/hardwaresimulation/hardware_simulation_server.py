@@ -27,7 +27,7 @@ import collections
 import sys
 
 import UCLA_CS_labrad.config.hardwaresimulationserver_config as hss_config
-from UCLA_CS_labrad.servers.hardwaresimulation import SimulatedGPIBInstrument, SimulatedSerialInstrument
+from UCLA_CS_labrad.servers.hardwaresimulation import SimulatedGPIBInstrumentInterface, SimulatedSerialInstrumentInterface
 from UCLA_CS_labrad.servers.hardwaresimulation.simulated_communication_interfaces import SimulatedGPIBCommunicationInterface,SimulatedSerialCommunicationInterface
 
 from UCLA_CS_labrad.servers.hardwaresimulation.cablesimulation.simulated_signals import CableError
@@ -137,10 +137,10 @@ class HardwareSimulationServer(LabradServer):
     def add_device(self, c, node, address,instr_model,is_gpib):
         if (node,address) in self.devices:
             raise HSSError(0)
-        if instr_model not in self.sim_instr_models or (issubclass(self.sim_instr_models[instr_model].cls,SimulatedGPIBInstrument))!=is_gpib:
+        if instr_model not in self.sim_instr_models or (issubclass(self.sim_instr_models[instr_model].cls,SimulatedGPIBInstrumentInterface))!=is_gpib:
             raise HSSError(2)
             
-        if issubclass(self.sim_instr_models[instr_model].cls,SimulatedGPIBInstrument):
+        if issubclass(self.sim_instr_models[instr_model].cls,SimulatedGPIBInstrumentInterface):
             self.devices[(node,address)]=SimulatedGPIBCommunicationInterface(self.sim_instr_models[instr_model].cls())
         else:
             self.devices[(node,address)]=SimulatedSerialCommunicationInterface(self.sim_instr_models[instr_model].cls())
@@ -336,7 +336,7 @@ class HardwareSimulationServer(LabradServer):
       
     @setting(92, 'Get Available Device Types',returns='*(ssb)')
     def get_available_device_types(self, c):
-        return [(model.name +' v'+model.version, model.description, (issubclass(model.cls,SimulatedGPIBInstrument))) for model in self.sim_instr_models.values()]
+        return [(model.name +' v'+model.version, model.description, (issubclass(model.cls,SimulatedGPIBInstrumentInterface))) for model in self.sim_instr_models.values()]
 
     @setting(100, "Reload Available Device Types")
     def reload_available_scripts(self, c):

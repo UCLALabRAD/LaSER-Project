@@ -292,8 +292,13 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscopeInstrument):
     description='Oscilloscope'
     id_string='AGILENT TECHNOLOGIES,DSO-X 2024A,MY58104761,02.43.2018020635'
     max_window_horizontal_scale=2.5
-    max_channel_scale=5
-    points_in_record_count=100000
+    max_vertical_channel_scale=5
+    vertical_divisions=8
+    horizontal_divisions=10
+    record_length=100000
+    def_window_horizontal_scale=1.0
+    def_channel_vertical_scale=1.0
+    channel_count=4
     command_dict={
         (b':MEASure:VAV?',1) : SimulatedOscilloscopeInstrument.measure_average,
         (b':MEASure:FREQ?',1) : SimulatedOscilloscopeInstrument.measure_frequency,
@@ -327,9 +332,7 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscopeInstrument):
         (b':CHANnel3:SCALe?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_scale(self,'3')),
         (b':CHANnel4:SCALe?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_scale(self,'4')),
         (b':TIMe:SCALe',1): SimulatedOscilloscopeInstrument.horizontal_scale,
-        (b':TIMe:SCALe?',0): SimulatedOscilloscopeInstrument.horizontal_scale,
-        (b':TIMe:POSition',1): SimulatedOscilloscopeInstrument.horizontal_position,
-        (b':TIMe:POSition?',0): SimulatedOscilloscopeInstrument.horizontal_position
+        (b':TIMe:SCALe?',0): SimulatedOscilloscopeInstrument.horizontal_scale
 
         
         }

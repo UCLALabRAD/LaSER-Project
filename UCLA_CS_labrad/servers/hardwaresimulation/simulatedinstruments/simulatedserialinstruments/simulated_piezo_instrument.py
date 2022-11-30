@@ -1,13 +1,13 @@
 
-from ..simulated_instruments import SimulatedSerialInstrument, SimulatedInstrumentError
+from ..simulated_instruments import SimulatedSerialInstrumentInterface, SimulatedInstrumentError
 
-from UCLA_CS_labrad.servers.hardwaresimulation import SimulatedPiezoPMTOutputSignal
+from UCLA_CS_labrad.servers.hardwaresimulation import SimulatedPiezoOutputSignal
 
 __all__=['SimulatedPiezoInstrument','SimulatedPiezoError']
 class SimulatedPiezoError(SimulatedInstrumentError):
     user_defined_errors={}
 
-class SimulatedPiezoInstrument(SimulatedSerialInstrument):
+class SimulatedPiezoInstrument(SimulatedSerialInstrumentInterface):
     name= None
     version = None
     description= None
@@ -25,21 +25,19 @@ class SimulatedPiezoInstrument(SimulatedSerialInstrument):
     set_toggle_on_string=None
     set_toggle_off_string=None
 
+    channel_count=None
+    signal_type=SimulatedPiezoOutputSignal
     
-    def __init__(self):
-        super().__init__()
-        self.channels=[]
-        for i in range(4):
-            self.channels.append(SimulatedPiezoPMTOutputSignal())
-        self.set_default_settings()
         
     def generate_constant_signal_func(self,voltage):
         return (lambda times: np.full(len(times),voltage))
 
-    def set_default_settings(self):
-        pass
 
-    
+    def set_default_settings(self):
+        super().set_default_settings()
+        
+    def set_signal_properties_starting_values(self,signal):
+        super().set_signal_properties_starting_values(signal)
     
         
     

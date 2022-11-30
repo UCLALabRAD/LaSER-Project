@@ -1,4 +1,4 @@
-from ..simulated_instruments import SimulatedGPIBInstrument, SimulatedInstrumentError
+from ..simulated_instruments import SimulatedGPIBInstrumentInterface, SimulatedInstrumentError
 from UCLA_CS_labrad.servers.hardwaresimulation.cablesimulation.simulated_signals import SimulatedInputSignal
 
 
@@ -14,27 +14,25 @@ __all__=["SimulatedOscilloscopeInstrument","SimulatedOscilloscopeError"]
 class SimulatedOscilloscopeError(SimulatedInstrumentError):
     user_defined_errors={}
 #penny CS GPIB Bus - USB0::0x0957::0x1796::MY58104761::INSTR
-class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
+class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrumentInterface):
     name=None
     version=None
     description=None
     id_string=None
     max_window_horizontal_scale=None
-    max_channel_scale=None
-    points_in_record_count=None
+    max_vertical_channel_scale=None
+    vertical_divisions=None
+    horizontal_divisions=None
+    channel_count=None
+    signal_type=(lambda self: SimulatedInputSignal(self.max_window_horizontal_scale*self.horizontal_divisions))
+    def_window_horizontal_scale=None
+    def_channel_vertical_scale=None
+    record_length=None
     
-    def __init__(self):
-        super().__init__()
-        self.channels=[]
-        for i in range(4):
-            self.channels.append(SimulatedInputSignal(self.max_window_horizontal_scale*10,self.points_in_record_count))
-        self.set_default_settings()
-            
     def set_default_settings(self):
-        self.window_horizontal_scale=1.0
-        self.window_horizontal_position=0.0
-        self.channel_positions=[0.0]*4
-        self.channel_scales=[1.0]*4
+        self.window_horizontal_scale=self.def_window_horizontal_scale
+        self.channel_positions=[0.0]*self.channel_count
+        self.channel_scales=[self.def_channel_vertical_scale]*self.channel_count
         
     def horizontal_scale(self,val=None):
         if val:
@@ -45,17 +43,10 @@ class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
             return str(self.window_horizontal_scale)
         
 
-    def horizontal_position(self,val=None):
-        if val:
-            val=self.enforce_type_and_range(val,(float,(self.window_horizontal_scale*-5,self.max_window_horizontal_scale*5)),"horizontal position")
-            self.window_horizontal_position=val
-        else:
-            return str(self.window_horizontal_position)
-        
     def channel_scale(self,chan, val=None):
         chan=self.enforce_type_and_range(chan,(int,(1,4)),"channel")
         if val:
-            val=self.enforce_type_and_range(val,(float,(0,self.max_channel_scale)),"channel scale")
+            val=self.enforce_type_and_range(val,(float,(0,self.max_vertical_channel_scale)),"channel scale")
             
             self.channel_scales[chan-1]=val
 
@@ -66,7 +57,7 @@ class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
     def channel_offset(self,chan, val=None):
         chan=self.enforce_type_and_range(chan,(int,(1,4)),"channel")
         if val:
-            val=self.enforce_type_and_range(val,(float,(-4*self.max_channel_scale,4*self.max_channel_scale)),"channel position")
+            val=self.enforce_type_and_range(val,(float,(-.5*self.vertical_divisions*self.channel_scales[chan-1],.5*self.vertical_divisions*self.channel_scales[chan-1])))
             self.channel_positions[chan-1]=-1*val
         else:
             return str(-1*self.channel_positions[chan-1])
@@ -83,9 +74,10 @@ class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
         pass
         
     def measure_average(self,chan):
-        chan=int(chan[-1])
+        chan=chan[-1]
+        chan=self.enforce_type_and_range(chan,(int,(1,4)),"channel")
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.channel_scales[chan-1],self.channel_positions[chan-1])
+        waveform=self.channels[chan-1].construct_waveform(self.window_horizontal_scale*self.horizontal_divisions,self.channel_positions[chan-1],-.5*self.vertical_divisions*self.channel_scales[chan-1],.5*self.vertical_divisions*self.channel_scales[chan-1],self.record_length)
         return str(self.calc_av_from_waveform(waveform))
         
     def calc_av_from_waveform(self,waveform):
@@ -95,9 +87,10 @@ class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
             return np.average(waveform)
         
     def measure_peak_to_peak(self,chan):
-        chan=int(chan[-1])
+        chan=chan[-1]
+        chan=self.enforce_type_and_range(chan,(int,(1,4)),"channel")
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.channel_scales[chan-1],self.channel_positions[chan-1])
+        waveform=self.channels[chan-1].construct_waveform(self.window_horizontal_scale*self.horizontal_divisions,self.channel_positions[chan-1],-.5*self.vertical_divisions*self.channel_scales[chan-1],.5*self.vertical_divisions*self.channel_scales[chan-1],self.record_length)
         return str(self.calc_p2p_from_waveform(waveform))
         
     def calc_p2p_from_waveform(self,waveform):
@@ -109,25 +102,24 @@ class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
             return max-min
         
     def measure_frequency(self,chan):
-        chan=int(chan[-1])
+        chan=chan[-1]
+        chan=self.enforce_type_and_range(chan,(int,(1,4)),"channel")
         self.channels[chan-1].is_on=True
-        waveform=self.channels[chan-1].generate_waveform(self.window_horizontal_scale,self.window_horizontal_position,self.channel_scales[chan-1],self.channel_positions[chan-1])
+        waveform=self.channels[chan-1].construct_waveform(self.window_horizontal_scale*self.horizontal_divisions,self.channel_positions[chan-1],-.5*self.vertical_divisions*self.channel_scales[chan-1],.5*self.vertical_divisions*self.channel_scales[chan-1],self.record_length)
         return str(self.calc_freq_from_waveform(waveform))
         
     def calc_freq_from_waveform(self,waveform):
         if not waveform:
-            return 1000000
+            return 0
         else:
             wavelength_starts=self.find_where_crossing(waveform)
-            if len(wavelength_starts)==0:
-                return 1000000
-            elif len(wavelength_starts)==1:
+            if len(wavelength_starts)<=1:
                 return 0
             first_cross=wavelength_starts[0]
             last_cross=wavelength_starts[-1]
             crosses=len(wavelength_starts)-1
             fraction_used=(last_cross-first_cross)/(len(waveform))
-            window_horiz_time_length=self.window_horizontal_scale*10
+            window_horiz_time_length=self.window_horizontal_scale*self.horizontal_divisions
             return crosses/(window_horiz_time_length*fraction_used)
         
     def find_where_crossing(self,waveform):
@@ -148,7 +140,7 @@ class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
         low_elig_freq=None
         for chan in range(len(self.channels)):
             self.channels[chan-1].is_on=True
-            waveform=self.channels[chan-1].generate_waveform(1.0,0.0,self.max_channel_scale,0.0)
+            waveform=self.channels[chan-1].construct_waveform(self.max_window_horizontal_scale*self.horizontal_divisions,self.channel_positions[chan-1],-.5*self.vertical_divisions*self.max_vertical_channel_scale,.5*self.vertical_divisions*self.max_vertical_channel_scale,self.record_length)
             freq=self.calc_freq_from_waveform(waveform)
             avg=self.calc_av_from_waveform(waveform)
             p2p=self.calc_p2p_from_waveform(waveform)
@@ -159,10 +151,10 @@ class SimulatedOscilloscopeInstrument(SimulatedGPIBInstrument):
                 if (not low_elig_freq) or freq<low_elig_freq:
                     low_elig_freq=freq
                 self.channel_positions[chan-1]=self.channel_positions[chan-1]-avg
-                self.channel_scales[chan-1]=min(p2p/4.0,self.max_channel_scale) #will be centered and take up 4 divisions / 8 vertical divisions
+                self.channel_scales[chan-1]=min(p2p/self.vertical_divisions,self.max_vertical_channel_scale) #will be centered and take up 4 divisions / 8 vertical divisions
         if low_elig_freq:
-            self.window_horizontal_scale=min(.1*3.0*(1/low_elig_freq),self.max_window_horizontal_scale) #try to show 3 wavelengths over 10 horizontal divisions
+            self.window_horizontal_scale=min((1/self.horizontal_divisions)*3.0*(1/low_elig_freq),self.max_window_horizontal_scale) #try to show 3 wavelengths over 10 horizontal divisions
         else:
-            self.window_horizontal_scale=1.0
+            self.window_horizontal_scale=self.def_window_horizontal_scale
 
     

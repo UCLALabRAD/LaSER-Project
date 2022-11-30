@@ -4,7 +4,7 @@ from twisted.internet.threads import deferToThread
 
 from datetime import datetime as dt
 
-from UCLA_CS_labrad.servers.hardwaresimulation.simulatedinstruments.simulated_instruments import SimulatedGPIBInstrument, SimulatedSerialInstrument,SimulatedInstrumentError
+from UCLA_CS_labrad.servers.hardwaresimulation.simulatedinstruments.simulated_instruments import SimulatedGPIBInstrumentInterface, SimulatedSerialInstrumentInterface,SimulatedInstrumentError
 
 class SimulatedCommunicationInterface(object):
 
@@ -44,7 +44,7 @@ class SimulatedCommunicationInterface(object):
         
     @property
     def type(self):
-        if issubclass(type(self.dev),SimulatedGPIBInstrument):
+        if issubclass(type(self.dev),SimulatedGPIBInstrumentInterface):
             return "GPIB"
         else:
             return "Serial"
@@ -151,6 +151,7 @@ class SimulatedSerialCommunicationInterface(SimulatedCommunicationInterface):
                 command_interpretation= yield deferToThread(lambda:self.interpret_serial_command(cmd))
                 
             except SimulatedInstrumentError as e:
+                raise e
                 self.error_list.append((str(dt.now()),cmd.decode(),str(e)))
                 
             
@@ -257,12 +258,13 @@ class SimulatedGPIBCommunicationInterface(SimulatedCommunicationInterface):
             if cmd==self.dev.id_command:
                 if not self.dev.id_string:
                     raise SimulatedInstrumentError(7)
-                return self.dev.id_string
+                return self.dev.id_string.encode()
             elif cmd==self.dev.clear_command:
                 self.clear_buffers()
                 return None
             elif cmd==self.dev.reset_command:
                 self.dev.set_default_settings()
+				
                 return
             else:
                 raise SimulatedInstrumentError(2)
@@ -339,6 +341,7 @@ class SimulatedGPIBCommunicationInterface(SimulatedCommunicationInterface):
                 command_interpretation= yield deferToThread(lambda:self.interpret_serial_command(cmd))
 
             except SimulatedInstrumentError as e:
+                raise e
                 self.error_list.append((str(dt.now()),cmd.decode(),str(e)))
             
             else:

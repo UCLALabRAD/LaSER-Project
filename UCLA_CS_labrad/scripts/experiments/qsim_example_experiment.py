@@ -2,9 +2,9 @@
 import labrad
 from UCLA_CS_labrad.scripts.experiments.qsimexperiment import QsimExperiment
  
-class experiment_example(QsimExperiment): 
+class QsimExampleExperiment1(QsimExperiment): 
 
-    name = 'Example Experiment'  # gives a name to display on scripscanner
+    name = 'Qsim Example Experiment 1'  # gives a name to display on scripscanner
 
     '''
     This expirement_example inherits from the QsimExperiment Class which in
@@ -21,8 +21,8 @@ class experiment_example(QsimExperiment):
     # variable named self.p.parameter_folder.parameter
 
     exp_parameters = []
-    exp_parameters.append(('example_parameters', 'Amplitude'))  # The format is (parameter folder, parameter)
-    exp_parameters.append((['example_parameters','sub1'], 'subsub1.Range'))
+    exp_parameters.append(('Qsim Example Experiment 1 Parameters', 'Amplitude'))  # The format is (parameter folder, parameter)
+    exp_parameters.append(('Qsim Example Experiment 1 Parameters', 'Range'))
 
     def initialize(self, cxn, context, ident):
 
@@ -42,12 +42,13 @@ class experiment_example(QsimExperiment):
         the parameters imported to affect equipment that you connected to in initialize. For this
         example we will draw a parabola for a given range with a given amplitude
         '''
+        params=self.p.qsim_example_experiment_1_parameters
         self.setup_datavault('Range', 'Amplitude')  # gives the x and y names to Data Vault
         #self.setup_grapher('experiment_example')  # Tells the grapher which tab to plot the data on
-        self.amplitude = self.p.example_parameters.Amplitude  # shortens the amplitude name
+        self.amplitude = params.Amplitude  # shortens the amplitude name
         # the following generates a list of the points used in the scan. If the points
         # have LabRAD unit types they can be specified in the second argument
-        self.x_values = self.get_scan_list(self.p.example_parameters.sub1.subsub1.Range, units=None)
+        self.x_values = self.get_scan_list(params.Range, units=None)
 
         for i, x_point in enumerate(self.x_values):  # Main Loop. Every iteration will have an index i and an associated x point 
 
@@ -73,6 +74,6 @@ if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()  # creates LabRAD connection
     scanner = cxn.script_scanner  # connects to script scanner server
-    exprt = experiment_example(cxn=cxn)  # instantiates the experiment
+    exprt = QsimExampleExperiment1(cxn=cxn)  # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)  # executes the experiment

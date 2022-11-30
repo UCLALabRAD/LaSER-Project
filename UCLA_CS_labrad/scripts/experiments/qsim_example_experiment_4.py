@@ -7,10 +7,10 @@ from labrad.units import WithUnit as U
 from UCLA_CS_labrad.scripts.experiments.qsimexperiment import QsimExperiment
 
 
-class LaserExperiment4(QsimExperiment):
+class QsimExampleExperiment4(QsimExperiment):
 
     # gives a name to display on scriptscanner
-    name = 'LaSER Experiment 4'
+    name = 'Qsim Example Experiment 4'
 
     """
     This sample experiment inherits from the QsimExperiment Class, which in
@@ -28,21 +28,21 @@ class LaserExperiment4(QsimExperiment):
     # The format is (parameter folder, parameter)
     exp_parameters = [
         # piezo parameters
-        ('example_parameters', 'Piezo_Connection_Bus'),
-        ('example_parameters', 'Piezo_Connection_Port'),
-        ('example_parameters', 'Piezo_Channel'),
+        ('Qsim Example Experiment 4 Parameters', 'Piezo_Connection_Bus'),
+        ('Qsim Example Experiment 4 Parameters', 'Piezo_Connection_Port'),
+        ('Qsim Example Experiment 4 Parameters', 'Piezo_Channel'),
 
         # oscilloscope parameters
-        ('example_parameters', 'Oscilloscope_Name'),
-        ('example_parameters', 'Oscilloscope_Channel'),
+        ('Qsim Example Experiment 4 Parameters', 'Oscilloscope_Name'),
+        ('Qsim Example Experiment 4 Parameters', 'Oscilloscope_Channel'),
 
         # output parameters
-        ('example_parameters', 'PWM_Length'),
-        ('example_parameters', 'PWM_Frequency'),
-        ('example_parameters', 'PWM_Voltage'),
+        ('Qsim Example Experiment 4 Parameters', 'PWM_Length'),
+        ('Qsim Example Experiment 4 Parameters', 'PWM_Frequency'),
+        ('Qsim Example Experiment 4 Parameters', 'PWM_Voltage'),
         
         # readout parameters
-        ('example_parameters', 'Poll_Interval')
+        ('Qsim Example Experiment 4 Parameters', 'Poll_Interval')
     ]
 
     def initialize(self, cxn, context, ident):
@@ -140,6 +140,6 @@ if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()                                  # creates LabRAD connection
     scanner = cxn.script_scanner                             # connects to script scanner server
-    exprt = LaserExperiment4(cxn=cxn)                     # instantiates the experiment
+    exprt = QsimExampleExperiment4(cxn=cxn)                     # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)    # registers an experiment with Script Scanner
     exprt.execute(ident)                                    # executes the experiment

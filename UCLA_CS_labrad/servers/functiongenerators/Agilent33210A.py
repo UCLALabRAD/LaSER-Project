@@ -83,8 +83,8 @@ class SimulatedAgilent33210A(SimulatedFunctionGeneratorInstrument):
     name= 'Agilent33210A'
     version = '1.0'
     description='test function generator'
-    function_map={"SIN":np.sin,"SQU":signal.square,"RAMP":signal.sawtooth}#duty supported for square, symmetry supported for ramp
-    freq_ranges={"SIN":(.001,10000000),"SQU":(.001,10000000),"RAMP":(.001,100000000)}
+    function_dictionary={"SIN":(np.sin,(.001,10000000)),"SQU":(signal.square,(.001,10000000)),"RAMP":(signal.sawtooth,(.001,100000000))}#duty supported for square, symmetry supported for ramp
+    
     max_voltage=5.0
     def_amp=.1
     def_freq=1000.0
@@ -104,7 +104,6 @@ class SimulatedAgilent33210A(SimulatedFunctionGeneratorInstrument):
         (b'FUNCtion?',0)        : SimulatedFunctionGeneratorInstrument.function,
         (b'VOLTage:OFFSet?',0)        : SimulatedFunctionGeneratorInstrument.offset
     }
-    freq_range=
     
     
             

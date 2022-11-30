@@ -1,26 +1,28 @@
 from ..simulated_signals import SimulatedOutputSignal
-    
+import numpy as np
 
-__all__=["SimulatedPiezoPMTOutputSignal"]
-class SimulatedPiezoPMTOutputSignal(SimulatedOutputSignal):
+__all__=["SimulatedPiezoOutputSignal"]
 
-    def __init__(self):
-        super().__init__()
-        self.current_voltage=0.0
+
+class SimulatedPiezoOutputSignal(SimulatedOutputSignal):
+
+    def initialize_signal_properties(self):
+        super().initialize_signal_properties()
+        self.voltage_val=0.0    
     
     @property
     def voltage(self):
-        return self.current_voltage
+        return self.voltage_val
     
     @voltage.setter
     def voltage(self,val):
-        self.current_voltage=val
-        self.update_signal_function()
+        self.voltage_val=val
+        self.update_signal()
     
         
-    def generate_constant_signal_func(self,voltage):
+    def generate_constant_func(self,voltage):
         return (lambda times: np.full(len(times),voltage))
         
         
-    def calculate_signal_function(self):
-        return self.generate_constant_signal_func(self.current_voltage)
+    def calculate_signal(self):
+        return self.generate_constant_func(self.voltage_val)

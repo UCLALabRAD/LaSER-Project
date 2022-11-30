@@ -1,4 +1,4 @@
-__all__=['SimulatedInstrumentError','SimulatedGPIBInstrument','SimulatedSerialInstrument']
+__all__=['SimulatedInstrumentError','SimulatedGPIBInstrumentInterface','SimulatedSerialInstrumentInterface']
 class SimulatedInstrumentError(Exception):
 
     user_defined_errors={}
@@ -23,16 +23,32 @@ class SimulatedInstrumentError(Exception):
     
     
     
-class SimulatedInstrument(object):
+class SimulatedInstrumentInterface(object):
     command_dict=None
     
     input_termination_byte=None
     output_termination_byte=None
     id_command=None
     id_string=None
+    channels=None
+    signal_type=None
+    channel_count=None
     
+    def __init__(self):
+        if self.channel_count:
+            self.channels=[]
+            for i in range(self.channel_count):
+                self.channels.append(self.signal_type())
+        self.set_default_settings()
+
+        
     def set_default_settings(self):
-        pass
+        for signal in self.channels:
+            self.set_signal_properties_starting_values(signal)
+        
+    def set_signal_properties_starting_values(self,signal):
+        signal.initialize_signal_properties()
+        
     
     def execute_command(self,func,args):
         return func(self,*args)
@@ -43,7 +59,7 @@ class SimulatedInstrument(object):
         correct_type=False
         for val_type,val_range in options:
             try:
-                val_type(val)
+                val=val_type(val)
                 correct_type=True
             except:
                 continue
@@ -60,7 +76,7 @@ class SimulatedInstrument(object):
         raise SimulatedInstrumentError(5,[val, param])
         
     
-class SimulatedSerialInstrument(SimulatedInstrument):
+class SimulatedSerialInstrumentInterface(SimulatedInstrumentInterface):
 
 
     input_termination_byte=b'\r\n'
@@ -72,13 +88,16 @@ class SimulatedSerialInstrument(SimulatedInstrument):
     required_stopbits=None
     required_dtr=None
     required_rts=None
-
+    signal_type=None
     command_dict=None
 
     
         
     def set_default_settings(self):
-        pass
+        super().set_default_settings()
+        
+    def set_signal_properties_starting_values(self,signal):
+        super().set_signal_properties_starting_values(signal)
         
     def process_communication_parameters(self,baudrate,bytesize,parity,stopbits,dtr,rts):
         if self.required_baudrate and baudrate!= self.required_baudrate:
@@ -97,21 +116,21 @@ class SimulatedSerialInstrument(SimulatedInstrument):
         
                 
             
-class SimulatedGPIBInstrument(SimulatedInstrument):
+class SimulatedGPIBInstrumentInterface(SimulatedInstrumentInterface):
 
     input_termination_byte=b';:'
     output_termination_byte=b';'
-    
+    signal_type=None
     id_command=b'*IDN?'
     clear_command=b'*CLS'
     reset_command=b'*RST'
     id_string=None
     
     command_dict=None
-
+    
     def set_default_settings(self):
-        pass
-
-            
-
-                
+        super().set_default_settings()
+      
+    def set_signal_properties_starting_values(self,signal):
+        super().set_signal_properties_starting_values(signal)
+        

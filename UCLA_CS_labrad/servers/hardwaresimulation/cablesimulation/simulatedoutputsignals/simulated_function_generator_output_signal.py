@@ -2,55 +2,56 @@ from ..simulated_signals import SimulatedOutputSignal
 import numpy as np
 __all__=["SimulatedFunctionGeneratorOutputSignal"]
 class SimulatedFunctionGeneratorOutputSignal(SimulatedOutputSignal):
-    def __init__(self):
-        super().__init__()
-        self.current_function="SIN"
-        self.current_frequency=1.0
-        self.current_amplitude=1.0
-        self.current_offset=0.0
+
+    def initialize_signal_properties(self):
+        super().initialize_signal_properties()
+        self.function_val=None
+        self.amplitude_val=None
+        self.frequency_val=None
+        self.offset_val=0.0
         
         
     def generate_periodic_signal_func(self,func,frequency,amplitude,offset):
-        return (lambda arr: (func((2*np.pi*frequency*arr)-offset))*amplitude)
+        return (lambda arr: (func((2*np.pi*frequency*arr)))*amplitude+offset)
         
-    def calculate_signal_function(self):
-        return self.generate_periodic_signal_func(self.function,self.frequency,self.amplitude,self.offset)
+    def calculate_signal(self):
+        return self.generate_periodic_signal_func(self.function[1],self.frequency,self.amplitude,self.offset)
        
         
     @property
     def function(self):
-        return self.current_function
+        return self.function_val
         
     @function.setter
     def function(self,val):
-        self.current_function=val
-        self.update_signal_function()
+        self.function_val=val
+        self.update_signal()
         
     @property
     def frequency(self):
-        return self.current_frequency
+        return self.frequency_val
         
     @frequency.setter
     def frequency(self,val):
-        self.current_frequency=val
-        self.update_signal_function()
+        self.frequency_val=val
+        self.update_signal()
             
     @property
     def amplitude(self):
-        return self.current_amplitude
+        return self.amplitude_val
         
     @amplitude.setter
     def amplitude(self,val):
-        self.current_amplitude=val
-        self.update_signal_function()
+        self.amplitude_val=val
+        self.update_signal()
             
     @property
     def offset(self):
-        return self.current_offset
+        return self.offset_val
         
     @offset.setter
     def offset(self,val):
-        self.current_offset=val
-        self.update_signal_function()
+        self.offset_val=val
+        self.update_signal()
     
     

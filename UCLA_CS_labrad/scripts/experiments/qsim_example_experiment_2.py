@@ -6,9 +6,9 @@ from labrad.units import WithUnit as U
 from UCLA_CS_labrad.scripts.experiments.qsimexperiment import QsimExperiment
 
 
-class experiment_example(QsimExperiment):
+class QsimExampleExperiment2(QsimExperiment):
 
-    name = 'CS Example Experiment 2'  # gives a name to display on scripscanner
+    name = 'Qsim Example Experiment 2'  # gives a name to display on scripscanner
 
     '''
     This expirement_example inherits from the QsimExperiment Class which in
@@ -27,8 +27,8 @@ class experiment_example(QsimExperiment):
     # variable named self.p.parameter_folder.parameter
 
     exp_parameters = []
-    exp_parameters.append(('example_parameters', 'Range'))  # The format is (parameter folder, parameter)
-    exp_parameters.append(('example_parameters', 'Amplitude'))
+    exp_parameters.append(('Qsim Example Experiment 2 Parameters', 'Range'))  # The format is (parameter folder, parameter)
+    exp_parameters.append(('Qsim Example Experiment 2 Parameters', 'Amplitude'))
 
     def initialize(self, cxn, context, ident):
 
@@ -89,6 +89,6 @@ if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()  # creates LabRAD connection
     scanner = cxn.scriptscanner  # connects to script scanner server
-    exprt = experiment_example(cxn=cxn)  # instantiates the experiment
+    exprt = QsimExampleExperiment2(cxn=cxn)  # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)  # executes the experiment

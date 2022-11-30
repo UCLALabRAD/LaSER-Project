@@ -7,9 +7,9 @@ from labrad.units import WithUnit as U
 from UCLA_CS_labrad.scripts.experiments.qsimexperiment import QsimExperiment
 
 
-class cs_example_experiment_3(QsimExperiment):
+class QsimExampleExperiment3(QsimExperiment):
 
-    name = 'cs_example_experiment_3'  # gives a name to display on scriptscanner
+    name = 'Qsim Example Experiment 3'  # gives a name to display on scriptscanner
 
     """
     This experiment_example inherits from the QsimExperiment Class which in
@@ -30,10 +30,10 @@ class cs_example_experiment_3(QsimExperiment):
     # The format is (parameter folder, parameter)
     exp_parameters = [
         # function generator parameters
-        ('example_parameters', 'Function_Generator_Name'),
-        ('example_parameters', 'Frequency'),
-        ('example_parameters', 'Amplitude'),
-        ('example_parameters', 'Plot_Points')
+        ('QsimExampleExperiment3Parameters', 'Function_Generator_Name'),
+        ('QsimExampleExperiment3Parameters', 'Frequency'),
+        ('QsimExampleExperiment3Parameters', 'Amplitude'),
+        ('QsimExampleExperiment3Parameters', 'Plot_Points')
     ]
 
     def initialize(self, cxn, context, ident):
@@ -99,6 +99,6 @@ if __name__ == '__main__':
     # Launches script if code is run from terminal instead of script scanner
     cxn = labrad.connect()                  # creates LabRAD connection
     scanner = cxn.script_scanner             # connects to script scanner server
-    exprt = cs_example_experiment_3(cxn=cxn)     # instantiates the experiment
+    exprt = QsimExampleExperiment3(cxn=cxn)     # instantiates the experiment
     ident = scanner.register_external_launch(exprt.name)  # registers an experiment with Script Scanner
     exprt.execute(ident)                    # executes the experiment

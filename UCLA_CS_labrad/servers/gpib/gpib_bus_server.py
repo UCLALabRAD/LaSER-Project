@@ -81,15 +81,15 @@ class GPIBBusServer(PollingServer):
         self.sim_addresses=[]
         self.HSS=None
         servers=yield self.client.manager.servers()
-        if 'Hardware Simulating Server' in [HSS_name for _,HSS_name in servers]:
+        if 'Hardware Simulation Server' in [HSS_name for _,HSS_name in servers]:
             yield self.client.refresh()
-            self.HSS=self.client.servers['Hardware Simulating Server']
+            self.HSS=self.client.servers['Hardware Simulation Server']
             yield self.HSS.signal__device_added(8675311)
             yield self.HSS.signal__device_removed(8675312)
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675311)
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
         self.rm_phys = visa.ResourceManager()
-        self.rm_sim = visa.ResourceManager('@SimulatedInstrumentBackend')
+        self.rm_sim = visa.ResourceManager('l@SimulatedInstrumentBackend')
         default_session=self.rm_sim.session
         self.rm_sim.visalib.set_attribute(default_session,'cli',self.client)
         self.rm_sim.visalib.set_attribute(default_session,'ser',self.HSS)

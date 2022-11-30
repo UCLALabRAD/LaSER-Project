@@ -1,5 +1,5 @@
 
-from ..simulated_instruments import SimulatedGPIBInstrument, SimulatedInstrumentError
+from ..simulated_instruments import SimulatedGPIBInstrumentInterface, SimulatedInstrumentError
 from UCLA_CS_labrad.servers.hardwaresimulation.cablesimulation.simulatedoutputsignals.simulated_function_generator_output_signal import SimulatedFunctionGeneratorOutputSignal
 
 __all__=["SimulatedFunctionGeneratorInstrument","SimulatedFunctionGeneratorError"]
@@ -7,37 +7,33 @@ __all__=["SimulatedFunctionGeneratorInstrument","SimulatedFunctionGeneratorError
 class SimulatedFunctionGeneratorError(SimulatedInstrumentError):
     user_defined_errors={}
 
-class SimulatedFunctionGeneratorInstrument(SimulatedGPIBInstrument):
+class SimulatedFunctionGeneratorInstrument(SimulatedGPIBInstrumentInterface):
     name=None
     version=None
     description=None
     id_string=None
-    freq_ranges=None
     max_voltage=None
-    function_map=None
+    function_dictionary=None
     def_amp=None
     def_freq=None
     def_func=None
     
-    def __init__(self):
-        self.channels=[]
-        for i in range(1):
-            self.channels.append(SimulatedFunctionGeneratorOutputSignal())
-        self.set_default_settings()
+    channel_count=1
+    signal_type=SimulatedFunctionGeneratorOutputSignal
+
         
     def set_default_settings(self):
-        for chan in self.channels:
-             chan.outputting=False
-             chan.offset=0.0
-             chan.function=(self.def_func,self.function_map[self.def_func])
-             chan.amplitude=self.def_amp
-             chan.frequency=self.def_freq
-             
-        
+        super().set_default_settings()
+    
+    def set_signal_properties_starting_values(self,signal):
+        super().set_signal_properties_starting_values(signal)
+        signal.function=(self.def_func,self.function_dictionary[self.def_func][0])
+        signal.amplitude=self.def_amp
+        signal.frequency=self.def_freq
         
     def toggle(self,status=None):
-        status=self.enforce_type_and_range(status,[(int,(0,1)),(str,["ON","OFF"])],"status")
         if status:
+            status=self.enforce_type_and_range(status,[(int,(0,1)),(str,["ON","OFF"])],"status")
             if status=='ON' or status==1:
                 self.channels[0].outputting=True
             elif status=='OFF' or status==0:
@@ -70,14 +66,14 @@ class SimulatedFunctionGeneratorInstrument(SimulatedGPIBInstrument):
             
     def function(self,func=None):
         if func:
-            func=self.enforce_type_and_range(func,(str,self.function_map.keys()),"function")
-            self.channels[0].function=(func,self.function_map[func])
+            func=self.enforce_type_and_range(func,(str,self.function_dictionary.keys()),"function")
+            self.channels[0].function=(func,self.function_dictionary[func][0])
         else:
             return self.channels[0].function[0]
 
     def calculate_freq_range(self):
         func_str=self.channels[0].function[0]
-        return freq_ranges[func_str]
+        return self.function_dictionary[func_str][1]
             
     def calculate_amp_range(self):
         return (0,2*(self.max_voltage-abs(self.channels[0].offset)))
