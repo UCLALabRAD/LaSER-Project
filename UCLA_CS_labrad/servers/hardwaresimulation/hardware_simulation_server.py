@@ -57,7 +57,7 @@ class HardwareSimulationServer(LabradServer):
 
     def initServer(self):
         super().initServer()
-        self.devices={}
+        self.wrapped_user_devices={}
         self.sim_instr_models={}
         self.load_simulated_instrument_models()
         if not self.sim_instr_models:
@@ -67,7 +67,7 @@ class HardwareSimulationServer(LabradServer):
         c['Device']=None
             
     
-    def load_simulated_instrument_models(self):
+    def load_simulated_instrument_models(self): #Credit: Michael Ramm, writer of ScriptScanner
         '''
         Loads simulated instrument classes from the configuration file.
         '''
@@ -135,15 +135,15 @@ class HardwareSimulationServer(LabradServer):
         
     @setting(31, 'Add Device', node='s',address='i', instr_model='s',is_gpib='b',returns='')
     def add_device(self, c, node, address,instr_model,is_gpib):
-        if (node,address) in self.devices:
+        if (node,address) in self.wrapped_user_devices:
             raise HSSError(0)
         if instr_model not in self.sim_instr_models or (issubclass(self.sim_instr_models[instr_model].cls,SimulatedGPIBInstrumentInterface))!=is_gpib:
             raise HSSError(2)
             
         if issubclass(self.sim_instr_models[instr_model].cls,SimulatedGPIBInstrumentInterface):
-            self.devices[(node,address)]=SimulatedGPIBCommunicationInterface(self.sim_instr_models[instr_model].cls())
+            self.wrapped_user_devices[(node,address)]=SimulatedGPIBCommunicationInterface(self.sim_instr_models[instr_model].cls())
         else:
-            self.devices[(node,address)]=SimulatedSerialCommunicationInterface(self.sim_instr_models[instr_model].cls())
+            self.wrapped_user_devices[(node,address)]=SimulatedSerialCommunicationInterface(self.sim_instr_models[instr_model].cls())
         self.device_added((node,address))
         
         
@@ -151,14 +151,14 @@ class HardwareSimulationServer(LabradServer):
         
     @setting(32, 'Remove Device', node='s', address='i', returns='')
     def remove_device(self,c, node, address):
-        if (node,address) not in self.devices:
+        if (node,address) not in self.wrapped_user_devices:
             raise HSSError(1)
         
         for context_obj in self.contexts.values():
-            if context_obj.data['Device'] is self.devices[(node,address)]:
+            if context_obj.data['Device'] is self.wrapped_user_devices[(node,address)]:
                 context_obj.data['Device']=None
                 break
-        del self.devices[(node,address)]
+        del self.wrapped_user_devices[(node,address)]
         
         self.device_removed((node,address))
     
@@ -214,7 +214,7 @@ class HardwareSimulationServer(LabradServer):
     def select_device(self,c,node,address):
         if c['Device']:
             raise HSSError(4)
-        c['Device']=self.devices[(node,address)]
+        c['Device']=self.wrapped_user_devices[(node,address)]
     
       
     @setting(62, 'Deselect Device',returns='')
@@ -345,8 +345,8 @@ class HardwareSimulationServer(LabradServer):
         
     @setting(110, "Add Simulated Wire",out_node='s',out_address='i',out_channel='i',in_node='s',in_address='i',in_channel='i')
     def add_simulated_wire(self,c,out_node,out_address,out_channel,in_node,in_address,in_channel):
-        out_dev=self.devices[(out_node,out_address)]
-        in_dev=self.devices[(in_node,in_address)]
+        out_dev=self.wrapped_user_devices[(out_node,out_address)]
+        in_dev=self.wrapped_user_devices[(in_node,in_address)]
         
         yield out_dev.lock.acquire()
         try:
@@ -372,8 +372,8 @@ class HardwareSimulationServer(LabradServer):
     
     @setting(111, "Remove Simulated Wire",out_node='s',out_address='i',out_channel='i',in_node='s',in_address='i',in_channel='i')
     def remove_simulated_wire(self,c,out_node,out_address,out_channel,in_node,in_address,in_channel):
-        out_dev=self.devices[(out_node,out_address)]
-        in_dev=self.devices[(in_node,in_address)]
+        out_dev=self.wrapped_user_devices[(out_node,out_address)]
+        in_dev=self.wrapped_user_devices[(in_node,in_address)]
         yield out_dev.lock.acquire()
         try:
             yield in_dev.lock.acquire()
@@ -396,11 +396,11 @@ class HardwareSimulationServer(LabradServer):
             
     @setting(121, "List Buses",returns='*s')
     def list_buses(self,c):
-        return list(set([loc[0] for loc in self.devices]))
+        return list(set([loc[0] for loc in self.wrapped_user_devices]))
         
     @setting(122, "List Devices", bus='s', returns='*(iss)')
     def list_devices(self,c,bus):
-        return [(loc[1],dev.name,dev.description) for loc,dev in self.devices.items() if loc[0]==bus]
+        return [(loc[1],dev.name,dev.description) for loc,dev in self.wrapped_user_devices.items() if loc[0]==bus]
 
 
     @setting(130, "Get Device Error List", returns='*(sss)')
@@ -422,7 +422,7 @@ class HardwareSimulationServer(LabradServer):
         """
         # check if we aren't connected to a device, address and node are fully specified,
         # and connected server is the required serial bus server
-        for node, address in self.devices.keys():
+        for node, address in self.wrapped_user_devices.keys():
             if name==node:
                self.device_added((node,address))
                     
