@@ -78,21 +78,37 @@ class Agilent33210AWrapper(GPIBDeviceWrapper):
     # todo
 
 
-#frequency,amplitude,toggle
+#Specific device class for simulated Agilent33210A Function Generator (GPIB Device).
 class SimulatedAgilent33210A(SimulatedFunctionGeneratorInstrument):
+
     name= 'Agilent33210A'
     version = '1.0'
     description='test function generator'
-    function_dictionary={"SIN":(np.sin,(.001,10000000)),"SQU":(signal.square,(.001,10000000)),"RAMP":(signal.sawtooth,(.001,100000000))}#duty supported for square, symmetry supported for ramp
     
+    #Here, we define class properties that were set to None in the generic device (parent) class,
+    #SimulatedFunctionGeneratorInstrument, giving them values specific to the Agilent 33210A model.
+    
+
+    
+
+    
+    #See SimulatedGPIBInstrumentInterface
+    id_string='Agilent Technologies,33210A,MY48007979,1.04-1.04-22-2'
+    
+    
+    #See SimulatedFunctionGeneratorInstrument
     max_voltage=5.0
     def_amp=.1
     def_freq=1000.0
     def_func="SIN"
-    
-    id_string='Agilent Technologies,33210A,MY48007979,1.04-1.04-22-2'
-    command_dict={
+    function_dictionary={"SIN":(np.sin,(.001,10000000)),"SQU":(signal.square,(.001,10000000)),"RAMP":(signal.sawtooth,(.001,100000000))}
 
+    
+
+    
+    #See SimulatedInstrumentInterface to learn about the command_dict, and SimulatedFunctionGeneratorInstrument
+    #to see definitions of this one's handler functions
+    command_dict={
         (b'OUTPut',1)           : SimulatedFunctionGeneratorInstrument.toggle,
         (b'FREQuency',1)        : SimulatedFunctionGeneratorInstrument.frequency,
         (b'VOLTage',1)        : SimulatedFunctionGeneratorInstrument.amplitude,
@@ -104,6 +120,3 @@ class SimulatedAgilent33210A(SimulatedFunctionGeneratorInstrument):
         (b'FUNCtion?',0)        : SimulatedFunctionGeneratorInstrument.function,
         (b'VOLTage:OFFSet?',0)        : SimulatedFunctionGeneratorInstrument.offset
     }
-    
-    
-            

@@ -45,7 +45,9 @@ class QsimExampleExperiment1(QsimExperiment):
         params=self.p.qsim_example_experiment_1_parameters
         self.setup_datavault('Range', 'Amplitude')  # gives the x and y names to Data Vault
         #self.setup_grapher('experiment_example')  # Tells the grapher which tab to plot the data on
+        
         self.amplitude = params.Amplitude  # shortens the amplitude name
+        
         # the following generates a list of the points used in the scan. If the points
         # have LabRAD unit types they can be specified in the second argument
         self.x_values = self.get_scan_list(params.Range, units=None)

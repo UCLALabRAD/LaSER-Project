@@ -10,14 +10,26 @@ class SimulatedCommunicationInterface(object):
 
     
     def __init__(self,dev):
+    
+        #each wrapper type has bytearrays (which can be extended and split by a specified byte pattern easily, just like strings) for
+        #input_ and output_buffers (named from the perspective of the client, not the device)
         self.input_buffer=bytearray(b'')
         self.output_buffer=bytearray(b'')
+        
+        #simulated device instantiated from the user-written specific device class.
         self.dev=dev
+        
+        #max buffer size for both input and output buffers
         self.max_buffer_size=1000
+        
+        
         self.lock=DeferredLock()
+        
+        
         self.error_list=[]
 
  
+    
     def read(self):
         pass
         

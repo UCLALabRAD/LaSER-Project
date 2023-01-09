@@ -285,12 +285,22 @@ class KeysightDSOX2024AWrapper(GPIBDeviceWrapper):
         # use this return if return format is in bytes, otherwise need to adjust
         return np.frombuffer(data[2 + tmc_N:], dtype=np.uint8)
         
-        
+#Specific device class for simulated KeysightDSOX2024A Oscilloscope (GPIB Device).
 class SimulatedKeysightDSOX2024A(SimulatedOscilloscopeInstrument):
     name= 'KeysightDSOX2024A'
     version = '1.0'
     description='Oscilloscope'
+    
+    #Here, we define class properties that were set to None in the generic device (parent) class,
+    #SimulatedOscilloscopeInstrument, giving them values specific to the KeysightDSOX2024A model.
+    
+    #See SimulatedInstrumentInterface
+    channel_count=4
+    
+    #See SimulatedGPIBInstrumentInterface
     id_string='AGILENT TECHNOLOGIES,DSO-X 2024A,MY58104761,02.43.2018020635'
+    
+    #See SimulatedOscilloscopeInterface
     max_window_horizontal_scale=2.5
     max_vertical_channel_scale=5
     vertical_divisions=8
@@ -298,7 +308,11 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscopeInstrument):
     record_length=100000
     def_window_horizontal_scale=1.0
     def_channel_vertical_scale=1.0
-    channel_count=4
+
+
+        
+    #See SimulatedInstrumentInterface to learn about the command_dict, and SimulatedOscilloscopeInstrument
+    #to see definitions of this one's handler functions
     command_dict={
         (b':MEASure:VAV?',1) : SimulatedOscilloscopeInstrument.measure_average,
         (b':MEASure:FREQ?',1) : SimulatedOscilloscopeInstrument.measure_frequency,
@@ -332,8 +346,5 @@ class SimulatedKeysightDSOX2024A(SimulatedOscilloscopeInstrument):
         (b':CHANnel3:SCALe?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_scale(self,'3')),
         (b':CHANnel4:SCALe?',0): (lambda self : SimulatedOscilloscopeInstrument.channel_scale(self,'4')),
         (b':TIMe:SCALe',1): SimulatedOscilloscopeInstrument.horizontal_scale,
-        (b':TIMe:SCALe?',0): SimulatedOscilloscopeInstrument.horizontal_scale
-
-        
-        }
-        
+        (b':TIMe:SCALe?',0): SimulatedOscilloscopeInstrument.horizontal_scale}
+    

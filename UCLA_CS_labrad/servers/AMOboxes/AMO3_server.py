@@ -168,20 +168,33 @@ if __name__ == '__main__':
     util.runServer(AMO3Server())
     
 
+#Specific device class for simulated AMO3 Piezo Box (Serial Device).
 class SimulatedAMO3(SimulatedPiezoInstrument):
     name= 'AMO3'
     version = '1.0'
     description='test piezo'
     
+    #Here, we define class properties that were set to None in the generic device (parent) class,
+    #SimulatedPiezoInstrument, giving them values specific to the AMO3 model.
+    
+    
+
+    #See SimulatedInstrumentInterface
+    channel_count=4
+
+    
+    #See SimulatedSerialInstrumentInterface
     required_baudrate=38400
     
+    #See SimulatedPiezoInstrument
     voltage_range=(0,150.0)
-    channel_count=4
-    
     set_voltage_string="vout.w : set output {} to {:.3f}"
     set_toggle_on_string="out.w : output {} enabled"
     set_toggle_off_string="out.w : output {} disabled"
     
+    
+    #See SimulatedInstrumentInterface to learn about the command_dict, and SimulatedPiezoInstrument
+    #to see definitions of this one's handler functions
     command_dict={
         (b'remote.r',1)           : None,
         (b'remote.w',2)        : None,
@@ -189,4 +202,7 @@ class SimulatedAMO3(SimulatedPiezoInstrument):
         (b'out.w',2)    : SimulatedPiezoInstrument.set_channel_status,
         (b'vout.r',1)   : SimulatedPiezoInstrument.get_channel_voltage,
         (b'vout.w',2)  : SimulatedPiezoInstrument.set_channel_voltage }
-
+        
+    
+    
+    

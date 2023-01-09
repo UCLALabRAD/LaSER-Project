@@ -19,6 +19,20 @@ class QsimExampleExperiment3(QsimExperiment):
 
     This has been modified from the original example experiment in that it attempts 
     to connect to a serial device, and uses both read and write functionality on the serial bus.
+    
+    QsimExampleExperiment3 can use any Function Generator supported by the Function Generator Server
+    (a full server subclassed from the GPIB Managed Device Server). This instrument is a GPIB device.
+    
+    
+    To set up the experiment, a Function Generator must be plugged into a computer running a GPIB Bus Server, and the
+    GPIB Device Manager and Function Generator Server must be running.
+    
+    If device is simulated, the "Function Generator" is an instance of a subclass of SimulatedFunctionGenegeratorInstrument in the Hardware Simulation Server.
+
+    
+    Simulating this experiment shows we can change the value of a property of a GPIB device via a GPIB set command,
+    that the device can maintain an internal state, and that we can get the value of a property of a GPIB device via a GPIB query command.
+
     """
 
     # The following defines which parameters you would like to use from
@@ -28,6 +42,12 @@ class QsimExampleExperiment3(QsimExperiment):
     # variable named self.p.parameter_folder.parameter
 
     # The format is (parameter folder, parameter)
+    
+    #QsimExampleExperiment3 has 4 parameters: Function_Generator_Name, Frequency, Amplitude, and Plot_Points.
+    #Function_Generator_Name is a string parameter, Frequency and Amplitude are float parameters, and Plot_Points is a scan parameter.
+    #The Function_Generator_Name parameter must be set to the name of the plugged-in device on the Function Generator Server
+    #(which is based off of which computer’s bus it’s on and the VISA resource name of the device).
+    
     exp_parameters = [
         # function generator parameters
         ('QsimExampleExperiment3Parameters', 'Function_Generator_Name'),
@@ -51,15 +71,21 @@ class QsimExampleExperiment3(QsimExperiment):
 
         # set up function generator
         self.fg_server = cxn.function_generator_server
+        
+        #The experiment first makes a Function Generator Server request to select the device based on the Function_Generator_Name parameter.
         self.fg_server.select_device(self.p.example_parameters.Function_Generator_Name)
+        #Then, it makes a request to this server to toggle on the device’s output channel.
         self.fg_server.toggle(True)
 
-        # set up waveform
+
+
+        #It makes two more requests to this server to set the frequency and amplitude of the
+        #electrical output signal to the Frequency and Amplitude parameters’ values respectively.
         self.fg_server.frequency(self.p.example_parameters.Frequency)
         self.fg_server.amplitude(self.p.example_parameters.Amplitude)
 
     def run(self, cxn, context):
-        """ #penny CS GPIB Bus - USB0::0x0957::0x1507::MY48007979::INSTR
+        """
         Here is where you write your experiment using the parameters imported
         to affect equipment that you connected to in initialize.
 
@@ -69,6 +95,8 @@ class QsimExampleExperiment3(QsimExperiment):
         # the following generates a list of the points used in the scan. If the points
         # have LabRAD unit types they can be specified in the second argument
         self.x_values = self.get_scan_list(self.p.example_parameters.Plot_Points, units=None)
+        
+        #It then uses a Function Generator Server request to get the frequency and amplitude of the output signal.
         self.frequency = self.fg_server.frequency()
         self.amplitude = self.fg_server.amplitude()
 
@@ -83,6 +111,8 @@ class QsimExampleExperiment3(QsimExperiment):
             if should_break:
                 break
 
+            #For each x-value encoded in the Plot_Points parameter, it calculates the value a sine wave having that frequency and
+            #amplitude would have for that x-value, and adds this data point to the dataset.
             y_point = self.amplitude * np.sin(2 * np.pi * self.frequency * x_point) # calculates the waveform
             self.dv.add(x_point, y_point)                                           # adds the data to Data Vault
 
