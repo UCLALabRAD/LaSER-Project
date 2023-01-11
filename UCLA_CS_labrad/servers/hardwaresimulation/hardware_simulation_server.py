@@ -598,7 +598,7 @@ class HardwareSimulationServer(LabradServer):
     @setting(130, "Get Device Error List", returns='*(sss)')
     def get_device_error_list(self,c):
         """
-        Get error list of selected device from CommunicationWrapper, clearing the list. Every time a SimulatedInstrumentError is raised in either the CommunicationWrapper or inside the device itself, it's added to this list.
+        Get error list of selected device from CommunicationWrapper, clearing the list. Every time a SimulatedInstrumentError is raised while a command is being interpreted  in either the CommunicationWrapper or inside the device itself, it's added to this list.
         Arguments:
             None
         Returns:
