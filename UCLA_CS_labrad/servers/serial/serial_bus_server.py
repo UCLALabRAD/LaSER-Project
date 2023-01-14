@@ -52,26 +52,26 @@ class SerialServer(PollingServer):
     POLL_ON_STARTUP = True
     port_update = Signal(PORTSIGNAL, 'signal: port update', '(s,*s)')
 
+
+    #TODO: Rename to SimulatedPort. This is our HSS-communicating object that mimics a Serial object.
     class DeviceConnection(object):
-        """
-        Wrapper for our server's client connection to the serial server.
-        @raise labrad.types.Error: Error in opening serial connection
-        """
         
         active_device_connections=[]
         def __init__(self, hss, node, name,context):
             
-            if name in self.active_device_connections:
+            if name in self.active_device_connections: #this list is shared across all SimulatedPorts. If different client has already selected simulated device, it will be in this list and can't make new connection to it
                 raise Error()
                 
             self.name=name
+            
+            
             self.ctxt=context
-            self.ser=hss
+            self.ser=hss #server wrapper for HSS,
             self.input_buffer=bytearray(b'')
             self.error_list=[]
             self.node=node
-            self.is_broken=False
-            self.is_closed=False
+            self.is_broken=False #device has been removed from HSS, or HSS stopped running. this connection cannot be opened again.
+            self.is_closed=False #device connection has been closed, but another client can connect to it still
             self.reset_output_buffer= lambda: self.ser.reset_output_buffer(context=self.ctxt)
             
             self.get_error_list=lambda: self.ser.get_device_error_list(context=self.ctxt)
@@ -90,9 +90,9 @@ class SerialServer(PollingServer):
             self.input_buffer=bytearray()
         
         def open(self):
-            self.active_device_connections.append(self.name)
-            if not self.is_broken and self.ser:
-                self.ser.select_device(self.node, int(self.name[-1]), context=self.ctxt)
+            self.active_device_connections.append(self.name) #this list is shared across all SimulatedPorts. add this port to list so no other clients can make a simulatedport connection to the simulated device at this port
+            if not self.is_broken and self.ser: #makes it so connection can't be opened again when broken
+                self.ser.select_device(self.node, int(self.name[-1]), context=self.ctxt) #see create_serial_connection
                 self.is_closed=False
                 
                 
@@ -104,20 +104,37 @@ class SerialServer(PollingServer):
 
         def close(self):
             if self.name in self.active_device_connections:
-                self.active_device_connections.remove(self.name)
+                self.active_device_connections.remove(self.name) #make device available to clients again if it still exists. otherwise, make it so clients are able to connect to a new device plugged in at this device's former simulated location
             if self.ser:
                 self.ser.deselect_device(context=self.ctxt)
             self.is_closed=True
+         
          
         @property
         def in_waiting(self):
             return len(self.input_buffer)
 
+        
         @property
         def out_waiting(self):
             return self.ser.get_out_waiting(context=self.ctxt)
             
-
+      
+        #There’s a big bold warning in the Twisted documentation that basically says not to use Deferred/callback logic inside a function passed to deferToThread.
+        #This means that the separate thread that executes deferredRead to use the client’s port object to check the port’s input buffer for available bytes,
+        #cannot ever make requests to the HSS if the client has a SimulatedPort-but deferredRead clearly calls the read method of the client’s port object.
+        #So the read method of our SimulatedPort cannot check for bytes in its device’s SerialCommunicationWrapper’s input_buffer in the HSS! Instead, we have our SimulatedPort’s
+        #write method make a write request to the HSS, which the HSS will respond to only when the selected device’s full output is ready in its SerialCommunicationWrapper’s
+        #input_buffer, and then attach callbacks to the returned Deferred instead of yielding. The first callback would be a read request to the HSS asking for the full
+        #contents of that input buffer. The input buffer will always be ready by the time the read request is handled because requests from the same context ID are always
+        #handled in order. The next callback would add the data from the full read to an input_buffer stored in the SimulatedPort object. Then, we do not yield or return
+        #this Deferred, so it does not end up being returned by the setting (which instead just returns the length of the data the client provided as an argument when making
+        #the read request). Thus, the effect is that since the Deferred was created in the reactor thread, its callback chain will be scheduled as a task when it fires, but
+        #since the setting did not return it, the SBS will respond to the write request immediately. Thus, the bytes the device output  eventually show up in the
+        #client’s SimulatedPort’s input_buffer, but the client can move on, just like with a real device! The only difference would be that all the bytes the device
+        #output corresponding to each write operation would show up in the SimulatedPort’s input_buffer as a group. To implement the read method for our SimulatedPort, we
+        # act exactly like the real Serial object (with the timeout of 0) does- just look at the byte count in the argument and immediately grab
+        #from the SimulatedPort’s input_buffer the minimum between that amount or the full input_buffer, and since it’s on the SBS side no Deferreds are involved!
         def read(self,byte_count):
             if self.is_closed:
                 raise Error()
@@ -148,8 +165,32 @@ class SerialServer(PollingServer):
             self.input_buffer.extend(data)
             #print(self.input_buffer)
             self.buff_lock.release()
-            
-            
+           
+           
+           
+         #baudrate is a property of the Serial object, not one of its methods, so the client’s argument is assigned to the Serial object’s baudrate
+         #property instead of being passed into a function. This poses a problem because in our SimulatedPort, baudrate needs to be a function,
+         #because it needs to make a request to the HSS to change the simulated device’s SerialCommunicationWrapper’s baudrate. Fortunately, the
+         #Python property decorator exists to help out programmers who find themselves in this dilemma. To use this decorator, we have to write two
+         #methods in the SimulatedPort object, one having no arguments and being decorated as a “baudrate property getter” and the other having one
+         #argument and being decorated as a “baudrate property setter”. This makes it so that if somebody tries to access baudrate as a property of
+         #the object, the getter function is secretly called and its return value is what the attempt to get the “property” gives.
+         #Similarly, if someone tries to set the object’s baudrate property, the value they try to set it to is secretly passed to the
+         #setter as its argument, and the setter is executed. This is one of those areas, however, where using inlineCallbacks and
+         #keeping the real-hardware-communication code intact clashed. Essentially, the Python interpreter does not allow one to write yield ser.baudrate=x or
+         #x=yield ser.baudrate, giving a syntax error for each. Fortunately, our knowledge of how servers treat context IDs and how parallelization
+         #works in LabRAD saves us here- we will not use inlineCallbacks. When the setting sets the baudrate property of the client’s SimulatedPort,
+         #the  SimulatedPort makes a request to the HSS to set the selected device’s SerialCommunicationWrapper’s baudrate, which returns a Deferred.
+         #We know this Deferred will fire with a value of None, which we don’t care about. We do not yield or return this Deferred.
+         #Next, when the setting gets the baudrate “property” of the client’s port, the SimulatedPort makes a request to the HSS to get the simulated device’s
+         #SerialCommunicationWrapper’s baudrate, which returns a Deferred that will eventually fire with that baudrate value. This we do care about,
+         #so the SimulatedPort’s baudrate getter returns it- based on how the property decorator works, this means getting the SimulatedPort’s b
+         #audrate “property” returns this Deferred. The baudrate SBS setting returns the client’s port object’s baudrate property, so it returns the
+         #Deferred. Because requests from the same context ID are always handled in order, the HSS will completely finish setting the simulated d
+         #evice’s baudrate and respond to the SimulatedPort before it accepts the next request from the SimulatedPort to get the baudrate. Because the
+         #baudrate SBS setting returned a Deferred, a new task is scheduled with the SBS’ reactor to return the baudrate value of the selected port’s d
+         #evice’s SerialCommunicationWrapper when the HSS responds to the request to get the baudrate and the Deferred fires.
+
         @property
         def baudrate(self):
             return self.ser.baudrate(None,context=self.ctxt)
@@ -161,7 +202,7 @@ class SerialServer(PollingServer):
             self.ser.baudrate(val,context=self.ctxt)
 
             
-                
+        #same idea for  all serial communication parameters
         @property
         def bytesize(self):
             return self.ser.bytesize(None,context=self.ctxt)
@@ -225,11 +266,14 @@ class SerialServer(PollingServer):
         self.HSS=None
         self.sim_dev_list=[]
         servers=yield self.client.manager.servers()
+        
+        #case where HSS already running
         if 'Hardware Simulation Server' in [HSS_name for _,HSS_name in servers]:
             self.HSS=self.client.servers['Hardware Simulation Server']
+            #Serial Bus Servers subscribe to two types of LabRAD Signals of Hardware Simulation Server (HSS) while booting up: device addition and device removal LabRAD Signals.
             yield self.HSS.signal__device_added(8675309)
             yield self.HSS.signal__device_removed(8675310)
-            yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309)
+            yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675309) #assign Signal handlers
             yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
         self.enumerate_serial_pyserial()
         
@@ -260,18 +304,18 @@ class SerialServer(PollingServer):
                 pass
             else:
                 _, _, dev_name = dev_path.rpartition(os.sep)
-                self.SerialPorts.append(SerialDevice(dev_name,dev_path,None))
+                self.SerialPorts.append(SerialDevice(dev_name,dev_path,None)) #no HSS  since serial device (acts as flag indicating real device)
             
         for d in self.sim_dev_list:
             try:
-                ser = self.DeviceConnection(None,self.name,d,None)
-                ser.close()
+                ser = self.DeviceConnection(None,self.name,d,None) #try to make SimulatedPort object for simulated port (a.k.a. "open Serial Port").
+                ser.close() #succeeded, so close and go to else branch
             except:
-                pass
+                pass #failed, so a different client already selected the device
                 
                 
             else:
-                self.SerialPorts.append(SerialDevice(d,None,self.HSS))
+                self.SerialPorts.append(SerialDevice(d,None,self.HSS)) #make SerialDevice object and add to serial ports list
                 
 
         port_list_tmp = [x.name for x in self.SerialPorts]
@@ -353,9 +397,17 @@ class SerialServer(PollingServer):
 
    
     def create_serial_connection(self,serial_device):
-        if serial_device.HSS:
+        if serial_device.HSS: #simulated port
+        
+            #During instantiation of the SimulatedPort object during the port-opening process, we could have the SBS generate a new context ID (client),
+            #store that context ID as an object variable in the SimulatedPort, and make a select_simulated_device request to the HSS to select
+            #the SimulatedPort’s corresponding simulated device, passing that new context ID. Then, any other HSS requests made in that SimulatedPort
+            #just need to pass that stored context ID! Each SBS client in each SBS is now a different client from the perspective of the HSS,
+            #each having their own context ID and dictionary.
             return self.DeviceConnection(serial_device.HSS,self.name,serial_device.name,self.client.context())
         else:
+        
+            #real port
             return Serial(serial_device.devicepath, timeout=0,exclusive=True)
                 
 
@@ -664,11 +716,32 @@ class SerialServer(PollingServer):
 
     @setting(71, 'Add Simulated Device', port='i', device_type='s',returns='')
     def add_simulated_device(self, c, port,device_type):
+    '''
+    Indirectly make an add_simulated_device request to the HSS,
+    only needing to provide the SimAddress since this server's internal client will automatically use the server’s name in the request.
+    
+    Arguments:
+        port (int): simaddress to add device at on HSS (so if x is provided, device will be added at SIMCOMx on this computer's serial bus)
+        device_type (str): simulated instument model to add
+    Returns:
+        None
+    '''
         if self.HSS:
             yield self.HSS.add_device(self.name,port,device_type,False)
+            
+        
         
     @setting(72, 'Remove Simulated Device', port='i', returns='')
     def remove_simulated_device(self, c, port):
+    '''
+    Indirectly make an remove_simulated_device request to the HSS,
+    only needing to provide the SimAddress since this server's internal client will automatically use the server’s name in the request.
+    
+    Arguments:
+        port (int): simaddress to remove device from on HSS (so if x is provided, device will be removed from SIMCOMx on this computer's serial bus
+    Returns:
+        None
+    '''
         if self.HSS:
             yield self.HSS.remove_device(self.name,port)
 
@@ -690,11 +763,7 @@ class SerialServer(PollingServer):
     # SIGNALS
     @inlineCallbacks
     def serverConnected(self, ID, name):
-        """
-        Attempt to connect to last connected serial bus server upon server connection.
-        """
-        # check if we aren't connected to a device, port and node are fully specified,
-        # and connected server is the required serial bus server
+        #when we start this SBS the HSS may not have been started yet. so we subscribe to signals here
         if name=='Hardware Simulation Server':
             yield self.client.refresh()
             self.HSS=self.client.servers['Hardware Simulation Server']
@@ -709,7 +778,7 @@ class SerialServer(PollingServer):
         if name=='Hardware Simulation Server':
             self.sim_dev_list=[]
             yield self.HSS.removeListener(listener=self.simDeviceAdded,source = None,ID=8675309)
-            yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675310)
+            yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675310) #unsubscribe from signals (important so as to not double-subscribe)
             self.HSS=None
             for ctxt_dict in [ctxt.data for ctxt in self.contexts.values()]:
                 port_obj=ctxt_dict['PortObject']
@@ -717,25 +786,42 @@ class SerialServer(PollingServer):
                     continue
                 elif isinstance(port_obj,self.DeviceConnection):
                     port_obj.ser=None
-                    port_obj.break_connection()
+                    port_obj.break_connection() # break all connections to all simulated devices
         
     
         
 
-
+    #Handler for "Device Added" LabRAD signal from HSS.
     def simDeviceAdded(self, c,data):
+        #data is a two-tuple of form (string, int).
+        #the string represents the bus server responsible for the device (based on the computer and which bus on the computer the device is being "plugged into").
+        #the int represents the device's SimAddress on the HSS (representing the port the device is "plugged into" on the bus).
+        #collectively these make the simulated location of the device on the HSS.
         node, port=data
         cli=self.client
+        
+        
+        #discard any signal about a device being added to a different bus (either a Serial bus on a different computer, or any GPIB bus).
+        #But if the server name matches, treat it as being “plugged in” to a new “simulated port” on the serial bus on this computer,
+        #treating the SimAddress as a simulated port number.
         if node==self.name:
+            #Add this simulated port to this server's simulated serial ports list, which will be polled at the same time as real ports are polled for real devices.
+            #To maintain a similar syntax for port names but avoid name clashes between real ports
+            #on the bus and simulated ones, we call simulated ports “SIMCOMx” (instead of “COMx” which is used for real ports on Windows) where ‘x’ is the SimAddress. To make things simple,
+            #a simulated port lives and dies with the device attached to it; there’s no such thing as a simulated port with no simulated device
+            #connected.
             self.sim_dev_list.append("SIMCOM"+str(port))
 
    
-   
+    #Handler for "Device Removed" LabRAD signal from HSS.
     def simDeviceRemoved(self, c, data):
         node, port=data
         if node==self.name:
+            #Remove this simulated port from this server's simulated serial ports list, which will be polled at the same time as real ports are polled for real devices.
             self.sim_dev_list.remove("SIMCOM"+str(port))
-            print(self.sim_dev_list)
+            
+            #find client with the removed device in their context dictionary (the one communicating with the device). there will only be at most one such client
+            #since the device disappears from the serial ports list once selected. break the SimulatedPort between the SBS and the HSS, so this client gets an error if they try to continue using the device, and so this simaddress can be used again when a new device is connected at that simulated location.
             for ctxt_dict in [ctxt.data for ctxt in self.contexts.values()]:
                 port_obj=ctxt_dict['PortObject']
                 if not port_obj:

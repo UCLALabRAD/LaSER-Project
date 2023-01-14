@@ -81,20 +81,42 @@ class GPIBBusServer(PollingServer):
         self.sim_addresses=[]
         self.HSS=None
         servers=yield self.client.manager.servers()
+        
+        #HSS already running case
         if 'Hardware Simulation Server' in [HSS_name for _,HSS_name in servers]:
             yield self.client.refresh()
             self.HSS=self.client.servers['Hardware Simulation Server']
             yield self.HSS.signal__device_added(8675311)
             yield self.HSS.signal__device_removed(8675312)
+            #GPIB Bus Servers subscribe to two types of LabRAD Signals of this Hardware Simulation Server (HSS) while booting up: device addition and device removal LabRAD Signals.
             yield self.HSS.addListener(listener=self.simDeviceAdded,source = None,ID=8675311)
-            yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
+            yield self.HSS.addListener(listener=self.simDeviceRemoved, source=None, ID=8675312) #assign handlers
         self.rm_phys = visa.ResourceManager()
+        
+        #second ResourceManager used in the GPIB Bus Server’s polls with a new backend (found in pyvisa_SimulatedInstrumentBackend),
+        #where resources are simulated GPIB instruments in the HSS.
+        #This backend is essentially a wrapper over the HSS API (settings), instead of a wrapper over the NI-VISA driver.
+        #When a ResourceManager with a default backend creates a Resource object to return to a caller of its open_resource method,
+        #it uses the provided resource name to determine what subclass of the base Resource class to return. For all the real GPIB devices,
+        #it returns a MessageBasedResource object; thus, this object is what is always stored in a GPIB Bus Server’s client’s
+        #context dictionary when they make an address (select) request. one can override the process  ResourceManager uses to pick the
+        #type of Resource object to return, and provide their own Resource subclass instead.  We write our own Resource subclass,
+        #called SimulatedInstrumentResource (which can be seen in pyvisa_SimulatedInstrumentBackend); this way we have to implement
+        #less methods in the new backend and essentially have more control over how each method call on the client’s Resource object
+        #acted from top to bottom, only using the PyVISA functionality to take care of getting Resources and managing VISA sessions.
+        #even if this means we’re mostly just doing glorified duck-typing, using the PyVISA infrastructure of Resources and backends
+        #in the GPIB Bus Server code provides the opportunity to move closer towards using the actual MessageBasedResource objects
+        #with our new backend, by editing the separate file with the implementation of SimulatedInstrumentResource and the new backend.
+
         self.rm_sim = visa.ResourceManager('l@SimulatedInstrumentBackend')
-        default_session=self.rm_sim.session
+        default_session=self.rm_sim.session #default resource manager session
+        
+        #pass tools to backend to communicate with HSS
         self.rm_sim.visalib.set_attribute(default_session,'cli',self.client)
         self.rm_sim.visalib.set_attribute(default_session,'ser',self.HSS)
         self.rm_sim.visalib.set_attribute(default_session,'node',self.name)
-        self.rm_sim.visalib.set_attribute(default_session,'sim_addresses',self.sim_addresses)
+        # load the reference to the simulated_device_list into the new backend as its “resource collection”
+        self.rm_sim.visalib.set_attribute(default_session,'sim_addresses',self.sim_addresses) #TODO: should be able to compact to one line by passing parameters when initializing resource manager
         self.refreshDevices()
 
         
@@ -108,6 +130,10 @@ class GPIBBusServer(PollingServer):
         Currently supported are GPIB devices and GPIB over USB.
         """
         try:
+            #instead of polling the simulated_device_list directly, and instantiating our own object for each new simulated device,
+            #we have both the ResourceManagers list their resources at the same time.
+            #Then, for each new resource name, we could get the Resource from the appropriate ResourceManager
+            #and put it in the resource dictionary.
             addresses = [str(x) for x in self.rm_phys.list_resources()+self.rm_sim.list_resources()]
             additions = set(addresses) - set(self.devices.keys())
             deletions = set(self.devices.keys()) - set(addresses)
@@ -116,6 +142,8 @@ class GPIBBusServer(PollingServer):
                 try:
                     if not addr.startswith(KNOWN_DEVICE_TYPES):
                         continue
+                        
+
                     instr = self.get_resource(addr)
                     instr.write_termination = ''
                     instr.clear()
@@ -137,9 +165,9 @@ class GPIBBusServer(PollingServer):
             
     def get_resource(self,address):
         try:
-            return self.rm_phys.open_resource(address,resource_pyclass=MessageBasedResource)
+            return self.rm_phys.open_resource(address,resource_pyclass=MessageBasedResource) #try opening physical resource
         except:
-            return self.rm_sim.open_resource(address,resource_pyclass=SimulatedInstrumentResource)
+            return self.rm_sim.open_resource(address,resource_pyclass=SimulatedInstrumentResource) #if this fails, try simulated
             
     def sendDeviceMessage(self, msg, addr):
         print(msg + ': ' + addr)
@@ -207,6 +235,8 @@ class GPIBBusServer(PollingServer):
         ans = ans.strip().decode()
         returnValue(ans)
 
+
+    #TODO: Update to use resource object's query method
     @setting(5, data='s', returns='s')
     def query(self, c, data):
         """
@@ -262,8 +292,7 @@ class GPIBBusServer(PollingServer):
         """
         Attempt to connect to last connected serial bus server upon server connection.
         """
-        # check if we aren't connected to a device, port and node are fully specified,
-        # and connected server is the required serial bus server
+        # case where HSS started after this bus server
         if name=='Hardware Simulating Server':
             yield self.client.refresh()
             self.HSS=self.client.servers['Hardware Simulating Server']
@@ -279,11 +308,13 @@ class GPIBBusServer(PollingServer):
     @inlineCallbacks
     def serverDisconnected(self, ID, name):
         if name=='Hardware Simulating Server':
-            self.sim_addresses.clear()
+            self.sim_addresses.clear() #all sim addresses removed
             yield self.HSS.removeListener(listener=self.simDeviceAdded,source = None,ID=8675311)
             yield self.HSS.removeListener(listener=self.simDeviceRemoved, source=None, ID=8675312)
             self.HSS=None
-            
+     
+     
+    #see settings with same names in SBS
     @setting(71, 'Add Simulated Device', address='i', device_type='s',returns='')
     def add_simulated_device(self, c, address,device_type):
         if self.HSS:
